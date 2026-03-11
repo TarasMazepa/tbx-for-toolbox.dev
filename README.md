@@ -1,3 +1,3 @@
 # toolbox
 
-A collection of scatered tools
+A collection of scattered tools
