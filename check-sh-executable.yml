@@ -1,0 +1,24 @@
+name: check-sh-executable.yml
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-sh-executable:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - run: |
+          non_executable=$(find . -type f -name "*.sh" ! -executable)
+          if [ -n "$non_executable" ]; then
+            echo "Error: Found non-executable .sh files:"
+            echo "$non_executable"
+            exit 1
+          fi
+          echo "All .sh files are executable."
