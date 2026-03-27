@@ -9,17 +9,13 @@ if [ ! -d "$TARGET_DIR" ]; then
     exit 1
 fi
 
-OUTPUT_FILE="combined.txt"
-
-# Clear or create the output file
-> "$OUTPUT_FILE"
+OUTPUT_FILE=$(mktemp)
+trap 'rm -f "$OUTPUT_FILE"' EXIT
 
 # Find all files in the target directory and its subdirectories
 # -type f: only files
-# -not -name "$OUTPUT_FILE": exclude the output file itself
 # -not -name "tbx-combine-files.sh": exclude this script
 find "$TARGET_DIR" -type f \
-    -not -name "$OUTPUT_FILE" \
     -not -name "tbx-combine-files.sh" \
     -not -path "*/.git/*" \
     | sort \
@@ -41,4 +37,6 @@ find "$TARGET_DIR" -type f \
     echo "" >> "$OUTPUT_FILE"
 done
 
-echo "Combined files into $OUTPUT_FILE"
+pbcopy < "$OUTPUT_FILE"
+
+echo "Combined files copied to clipboard"
