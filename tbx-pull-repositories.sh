@@ -22,8 +22,8 @@ while IFS= read -r folder || [ -n "$folder" ]; do
 	target_dir="$HOME/$folder"
 
 	if [ -d "$target_dir" ]; then
-		echo "Processing $target_dir..."
 		(
+			echo "Processing $target_dir..."
 			cd "$target_dir" || exit
 			stax pull --force-delete --quiet --decline-all
 			echo "Done processing $target_dir"
