@@ -1,10 +1,12 @@
 #!/bin/bash
 
-REPOS_FILE="till/repositories.txt"
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+REPOS_FILE="$SCRIPT_DIR/till/repositories.txt"
 
 if [ ! -f "$REPOS_FILE" ]; then
     echo "Error: $REPOS_FILE does not exist. It needs to be created."
-    echo "You can create it by running: mkdir -p till && touch till/repositories.txt"
+    echo "You can create it by running:"
+    echo "mkdir -p \"$SCRIPT_DIR/till\" && touch \"$REPOS_FILE\""
     exit 1
 fi
 
