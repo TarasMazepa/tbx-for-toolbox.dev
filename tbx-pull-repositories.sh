@@ -25,7 +25,7 @@ while IFS= read -r folder || [ -n "$folder" ]; do
         echo "Processing $target_dir..."
         (
             cd "$target_dir" || exit
-            stax pull -f
+            stax pull --force-delete --quiet --decline-all
         ) &
     else
         echo "Warning: Directory $target_dir does not exist. Skipping..."
