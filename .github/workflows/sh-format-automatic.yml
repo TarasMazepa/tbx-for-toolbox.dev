@@ -12,6 +12,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.client_payload.ref }}
+      - name: Install shfmt
+        run: sudo snap install shfmt
       - run: shfmt -w .
       - run: |
           if ! git diff --quiet; then
@@ -27,5 +29,5 @@ jobs:
             gh workflow run check-format-pr-status.yml -f pr_number=$pr_number -f branch_name=$branch_name
           fi
         env:
-          BASE: ${{ github.event.client_payload.ref }}
+          BASE: ${{ github.event.client_payload.ref || 'main' }}
           GH_TOKEN: ${{ secrets.PAT }}
