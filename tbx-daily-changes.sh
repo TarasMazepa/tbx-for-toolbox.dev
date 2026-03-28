@@ -33,13 +33,31 @@ while IFS= read -r folder || [ -n "$folder" ]; do
 		(
 			cd "$target_dir" || exit 1
 			if [ -d ".git" ]; then
-				CHANGES=$(git --no-pager log --since="$START_DATE" --until="$END_DATE" -p)
-				if [ -n "$CHANGES" ]; then
-					{
-						echo "===== $folder ====="
-						echo "$CHANGES"
-						echo ""
-					} >>"$OUTPUT_FILE"
+				# Find the last commit BEFORE start date
+				START_COMMIT=$(git rev-list -1 --before="$START_DATE" HEAD 2>/dev/null)
+				# Find the last commit BEFORE end date
+				END_COMMIT=$(git rev-list -1 --before="$END_DATE" HEAD 2>/dev/null)
+
+				if [ -n "$START_COMMIT" ] && [ -n "$END_COMMIT" ] && [ "$START_COMMIT" != "$END_COMMIT" ]; then
+					CHANGES=$(git diff "$START_COMMIT" "$END_COMMIT")
+					if [ -n "$CHANGES" ]; then
+						{
+							echo "===== $folder ====="
+							echo "$CHANGES"
+							echo ""
+						} >>"$OUTPUT_FILE"
+					fi
+				elif [ -z "$START_COMMIT" ] && [ -n "$END_COMMIT" ]; then
+					# If there's no commit before start date, but there's a commit before end date,
+					# we can use the empty tree to show all additions.
+					CHANGES=$(git diff 4b825dc642cb6eb9a060e54bf8d69288fbee4904 "$END_COMMIT")
+					if [ -n "$CHANGES" ]; then
+						{
+							echo "===== $folder ====="
+							echo "$CHANGES"
+							echo ""
+						} >>"$OUTPUT_FILE"
+					fi
 				fi
 			fi
 		)
