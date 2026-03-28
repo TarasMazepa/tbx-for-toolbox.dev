@@ -26,8 +26,10 @@ while IFS= read -r folder || [ -n "$folder" ]; do
         (
             cd "$target_dir" || exit
             stax pull -f
-        )
+        ) &
     else
         echo "Warning: Directory $target_dir does not exist. Skipping..."
     fi
 done < "$REPOS_FILE"
+
+wait
