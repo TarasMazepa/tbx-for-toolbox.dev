@@ -23,10 +23,12 @@ while IFS= read -r folder || [ -n "$folder" ]; do
 
 	if [ -d "$target_dir" ]; then
 		(
+			start_time=$SECONDS
 			echo "Processing $target_dir..."
 			cd "$target_dir" || exit
 			stax pull --force-delete --quiet --decline-all
-			echo "Done processing $target_dir"
+			elapsed=$((SECONDS - start_time))
+			echo "Done processing $target_dir in ${elapsed}s"
 		) &
 	else
 		echo "Warning: Directory $target_dir does not exist. Skipping..."
