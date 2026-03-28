@@ -1,9 +1,10 @@
 #!/bin/bash
 
-REPOS_FILE="$HOME/repositories.txt"
+REPOS_FILE="till/repositories.txt"
 
 if [ ! -f "$REPOS_FILE" ]; then
-    echo "Error: $REPOS_FILE does not exist."
+    echo "Error: $REPOS_FILE does not exist. It needs to be created."
+    echo "You can create it by running: mkdir -p till && touch till/repositories.txt"
     exit 1
 fi
 
