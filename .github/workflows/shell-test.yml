@@ -1,0 +1,25 @@
+name: shell-test.yml
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  shell-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: shfmt -d .
+        id: format-check
+        continue-on-error: true
+      - uses: peter-evans/repository-dispatch@v3
+        if: steps.format-check.outcome == 'failure'
+        with:
+          token: ${{ secrets.PAT }}
+          repository: ${{ github.repository }}
+          event-type: format-sh-code
+          client-payload: '{"ref": "${{ github.head_ref }}"}'
+      - run: shfmt -d .
+        if: steps.format-check.outcome == 'failure'
+      - run: shellcheck *.sh

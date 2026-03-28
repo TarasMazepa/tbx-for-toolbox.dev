@@ -1,0 +1,23 @@
+name: sh-format.yml
+on:
+  workflow_dispatch:
+
+jobs:
+  sh-format:
+    permissions: write-all
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: shfmt -w .
+      - run: |
+          if ! git diff --quiet; then
+            branch_name=format-sh-code-in-${GITHUB_REF#refs/heads/}-branch-at-$(date -u +"%Y-%m-%dT%H-%M-%S")
+            git config --global user.name 'github-actions[bot]'
+            git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+            git checkout -b $branch_name
+            git commit -a -m "Format sh code in ${GITHUB_REF#refs/heads/} branch"
+            git push --set-upstream origin $branch_name
+            gh pr merge $(gh pr create -B ${GITHUB_REF#refs/heads/} -f) --auto --squash
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.PAT }}
