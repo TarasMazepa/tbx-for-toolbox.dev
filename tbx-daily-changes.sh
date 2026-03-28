@@ -12,16 +12,15 @@ fi
 
 START_DATE=$(date -d "yesterday 00:00:00" +"%Y-%m-%d %H:%M:%S")
 END_DATE=$(date -d "today 00:00:00" +"%Y-%m-%d %H:%M:%S")
+EMPTY_TREE_HASH="4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
 OUTPUT_FILE="$PWD/daily_changes.txt"
-true >"$OUTPUT_FILE" # Clear or create file
+# shellcheck disable=SC2188
+>"$OUTPUT_FILE" # Clear or create file
 
 echo "Gathering changes from $START_DATE to $END_DATE..."
 
-while IFS= read -r folder || [ -n "$folder" ]; do
-	# Trim leading/trailing whitespace
-	folder="$(echo -e "${folder}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
-
+while read -r folder || [ -n "$folder" ]; do
 	# Skip empty lines and comments
 	if [[ -z "$folder" || "$folder" == \#* ]]; then
 		continue
@@ -31,7 +30,7 @@ while IFS= read -r folder || [ -n "$folder" ]; do
 
 	if [ -d "$target_dir" ]; then
 		(
-			cd "$target_dir" || exit 1
+			cd "$target_dir" || exit 1 # Exits the subshell, skipping to next repo
 			if [ -d ".git" ]; then
 				# Find the last commit BEFORE start date
 				START_COMMIT=$(git rev-list -1 --before="$START_DATE" HEAD 2>/dev/null)
@@ -50,7 +49,7 @@ while IFS= read -r folder || [ -n "$folder" ]; do
 				elif [ -z "$START_COMMIT" ] && [ -n "$END_COMMIT" ]; then
 					# If there's no commit before start date, but there's a commit before end date,
 					# we can use the empty tree to show all additions.
-					CHANGES=$(git diff 4b825dc642cb6eb9a060e54bf8d69288fbee4904 "$END_COMMIT")
+					CHANGES=$(git diff "$EMPTY_TREE_HASH" "$END_COMMIT")
 					if [ -n "$CHANGES" ]; then
 						{
 							echo "===== $folder ====="
