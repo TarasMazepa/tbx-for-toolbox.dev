@@ -10,13 +10,8 @@ if [ ! -f "$REPOS_FILE" ]; then
 	exit 1
 fi
 
-if date --version >/dev/null 2>&1; then
-	START_DATE=$(date -d "yesterday 00:00:00" +"%Y-%m-%d %H:%M:%S")
-	END_DATE=$(date -d "today 00:00:00" +"%Y-%m-%d %H:%M:%S")
-else
-	START_DATE=$(date -v-1d +"%Y-%m-%d 00:00:00")
-	END_DATE=$(date +"%Y-%m-%d 00:00:00")
-fi
+START_DATE=$(date -v-1d +"%Y-%m-%d 00:00:00")
+END_DATE=$(date +"%Y-%m-%d 00:00:00")
 EMPTY_TREE_HASH="4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
 OUTPUT_FILE="$PWD/daily_changes.txt"
