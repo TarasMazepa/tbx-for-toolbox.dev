@@ -10,7 +10,11 @@ if [ ! -f "$REPOS_FILE" ]; then
 	exit 1
 fi
 
-START_DATE=$(date -v-1d +"%Y-%m-%d 00:00:00")
+if [[ "$OSTYPE" == "darwin"* ]]; then
+	START_DATE=$(date -v-1d +"%Y-%m-%d 00:00:00")
+else
+	START_DATE=$(date -d "yesterday" +"%Y-%m-%d 00:00:00")
+fi
 END_DATE=$(date +"%Y-%m-%d 00:00:00")
 EMPTY_TREE_HASH="4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 

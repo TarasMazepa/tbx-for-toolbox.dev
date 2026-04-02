@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Infinity Notes</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --text-color: #f8fafc;
+            --accent-color: #38bdf8;
+            --muted-color: #64748b;
+            --font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            --mono-family: 'Fira Code', 'JetBrains Mono', 'Courier New', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-family);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            padding: 2rem;
+        }
+
+        .header {
+            width: 100%;
+            max-width: 800px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            opacity: 0.8;
+        }
+
+        .title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            letter-spacing: -0.025em;
+            color: var(--accent-color);
+        }
+
+        .status {
+            font-size: 0.875rem;
+            color: var(--muted-color);
+            transition: opacity 0.3s ease;
+        }
+
+        .status.saving {
+            opacity: 1;
+            color: var(--accent-color);
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            flex-grow: 1;
+            position: relative;
+        }
+
+        #notes {
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: var(--text-color);
+            font-family: var(--mono-family);
+            font-size: 1.1rem;
+            line-height: 1.6;
+            resize: none;
+            padding: 1rem;
+            scrollbar-width: thin;
+            scrollbar-color: var(--muted-color) transparent;
+        }
+
+        #notes::placeholder {
+            color: var(--muted-color);
+            opacity: 0.5;
+        }
+
+        #notes::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #notes::-webkit-scrollbar-thumb {
+            background-color: var(--muted-color);
+            border-radius: 10px;
+        }
+
+        .hint {
+            position: fixed;
+            bottom: 2rem;
+            font-size: 0.75rem;
+            color: var(--muted-color);
+            opacity: 0.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="title">infinity note</div>
+        <div id="status" class="status">All changes saved.</div>
+    </div>
+
+    <div class="container">
+        <textarea id="notes" placeholder="Start typing... Press Enter to push content down."></textarea>
+    </div>
+
+    <div class="hint">Press Enter to insert a new line at the top of the current block.</div>
+
+    <script>
+        const notesArea = document.getElementById('notes');
+        const statusEl = document.getElementById('status');
+        let saveTimeout;
+
+        // Load content
+        const savedContent = localStorage.getItem('infinity_notes');
+        if (savedContent) {
+            notesArea.value = savedContent;
+        }
+
+        // Auto-save logic
+        function saveContent() {
+            localStorage.setItem('infinity_notes', notesArea.value);
+            statusEl.textContent = 'All changes saved.';
+            statusEl.classList.remove('saving');
+        }
+
+        notesArea.addEventListener('input', () => {
+            statusEl.textContent = 'Saving...';
+            statusEl.classList.add('saving');
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(saveContent, 500);
+        });
+
+        // The "Quirk": Enter key behavior
+        notesArea.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+
+                const start = notesArea.selectionStart;
+                const value = notesArea.value;
+
+                // Find the start of the current line
+                let currentLineStart = value.lastIndexOf('\n', start - 1);
+                
+                // If lastIndexOf is -1, it means we're on the first line
+                currentLineStart = currentLineStart === -1 ? 0 : currentLineStart + 1;
+
+                // Insert newline at the beginning of the current line
+                const newValue = value.slice(0, currentLineStart) + '\n' + value.slice(currentLineStart);
+                notesArea.value = newValue;
+
+                // Move cursor to the new line
+                notesArea.selectionStart = notesArea.selectionEnd = currentLineStart;
+                
+                // Trigger auto-save
+                notesArea.dispatchEvent(new Event('input'));
+            }
+        });
+
+        // Initial focus
+        notesArea.focus();
+    </script>
+</body>
+</html>
