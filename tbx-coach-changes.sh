@@ -24,15 +24,19 @@ get_clipboard() {
 	fi
 }
 
-CLIPBOARD_DATA=$(get_clipboard)
+if [ -n "$1" ]; then
+	EXTRACTED_DATE="$1"
+else
+	CLIPBOARD_DATA=$(get_clipboard)
 
-# Try to extract a date like "Mar 8, 2026"
-EXTRACTED_DATE=$(echo "$CLIPBOARD_DATA" | grep -oE "[A-Z][a-z]{2} [0-9]{1,2}, [0-9]{4}" | head -n 1)
+	# Try to extract a date like "Mar 8, 2026"
+	EXTRACTED_DATE=$(echo "$CLIPBOARD_DATA" | grep -oE "[A-Z][a-z]{2} [0-9]{1,2}, [0-9]{4}" | head -n 1)
 
-if [ -z "$EXTRACTED_DATE" ]; then
-	echo "Error: No valid date found in clipboard."
-	echo "Please copy the data containing a date (e.g. 'Mar 8, 2026') into your clipboard and run this script again."
-	exit 1
+	if [ -z "$EXTRACTED_DATE" ]; then
+		echo "Error: No valid date found in clipboard."
+		echo "Please copy the data containing a date (e.g. 'Mar 8, 2026') into your clipboard and run this script again."
+		exit 1
+	fi
 fi
 
 # Parse the extracted date
