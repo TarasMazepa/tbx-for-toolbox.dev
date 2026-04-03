@@ -116,7 +116,7 @@
         <textarea id="notes" placeholder="Start typing... Press Enter to push content down."></textarea>
     </div>
 
-    <div class="hint">Press Enter to insert a new line at the top of the current block.</div>
+    <div class="hint">Press Enter to insert a new line at the top of the current block. Shift+Enter for regular new line.</div>
 
     <script>
         const notesArea = document.getElementById('notes');
@@ -146,6 +146,10 @@
         // The "Quirk": Enter key behavior
         notesArea.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
+                if (e.shiftKey) {
+                    return; // Allow default behavior for Shift+Enter
+                }
+
                 e.preventDefault();
 
                 const start = notesArea.selectionStart;
