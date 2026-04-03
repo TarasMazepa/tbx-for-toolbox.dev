@@ -24,8 +24,8 @@ get_clipboard() {
 	fi
 }
 
-if [ "$#" -gt 0 ]; then
-	EXTRACTED_DATE="$*"
+if [ -n "$1" ]; then
+	EXTRACTED_DATE="$1"
 else
 	CLIPBOARD_DATA=$(get_clipboard)
 
@@ -42,12 +42,20 @@ fi
 # Parse the extracted date
 if date --version >/dev/null 2>&1; then
 	# GNU date
+	if ! date -d "$EXTRACTED_DATE" >/dev/null 2>&1; then
+		echo "Error: Invalid date format '$EXTRACTED_DATE'."
+		exit 1
+	fi
 	START_DATE=$(date -d "$EXTRACTED_DATE" +"%Y-%m-%d 00:00:00")
 	FILENAME_START_DATE=$(date -d "$EXTRACTED_DATE" +"%b-%-d-%Y")
 	CURRENT_DATE_FILENAME=$(date +"%b-%-d-%Y")
 	END_DATE=$(date +"%Y-%m-%d 23:59:59")
 else
 	# BSD date
+	if ! date -j -f "%b %e, %Y" "$EXTRACTED_DATE" >/dev/null 2>&1; then
+		echo "Error: Invalid date format '$EXTRACTED_DATE'."
+		exit 1
+	fi
 	START_DATE=$(date -j -f "%b %e, %Y" "$EXTRACTED_DATE" +"%Y-%m-%d 00:00:00")
 	FILENAME_START_DATE=$(date -j -f "%b %e, %Y" "$EXTRACTED_DATE" +"%b-%e-%Y" | tr -d ' ')
 	CURRENT_DATE_FILENAME=$(date +"%b-%e-%Y" | tr -d ' ')
