@@ -24,8 +24,8 @@ get_clipboard() {
 	fi
 }
 
-if [ -n "$1" ]; then
-	EXTRACTED_DATE="$1"
+if [ "$#" -gt 0 ]; then
+	EXTRACTED_DATE="$*"
 else
 	CLIPBOARD_DATA=$(get_clipboard)
 
