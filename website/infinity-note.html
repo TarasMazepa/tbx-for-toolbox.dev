@@ -143,11 +143,7 @@
             saveTimeout = setTimeout(saveContent, 500);
         });
 
-        function moveLinesUp(notesArea) {
-            const value = notesArea.value;
-            const start = notesArea.selectionStart;
-            const end = notesArea.selectionEnd;
-
+        function getLineBoundaries(value, start, end) {
             let firstLineStart = value.lastIndexOf('\n', start - 1);
             firstLineStart = firstLineStart === -1 ? 0 : firstLineStart + 1;
 
@@ -157,6 +153,15 @@
             } else {
                 lastLineEnd = lastLineEnd === -1 ? value.length : lastLineEnd;
             }
+            return { firstLineStart, lastLineEnd };
+        }
+
+        function moveLinesUp(notesArea) {
+            const value = notesArea.value;
+            const start = notesArea.selectionStart;
+            const end = notesArea.selectionEnd;
+
+            const { firstLineStart, lastLineEnd } = getLineBoundaries(value, start, end);
 
             if (firstLineStart === 0) return;
 
@@ -180,15 +185,7 @@
             const start = notesArea.selectionStart;
             const end = notesArea.selectionEnd;
 
-            let firstLineStart = value.lastIndexOf('\n', start - 1);
-            firstLineStart = firstLineStart === -1 ? 0 : firstLineStart + 1;
-
-            let lastLineEnd = value.indexOf('\n', end);
-            if (end > start && value[end - 1] === '\n') {
-                lastLineEnd = end - 1;
-            } else {
-                lastLineEnd = lastLineEnd === -1 ? value.length : lastLineEnd;
-            }
+            const { firstLineStart, lastLineEnd } = getLineBoundaries(value, start, end);
 
             if (lastLineEnd === value.length) return;
 
