@@ -143,8 +143,81 @@
             saveTimeout = setTimeout(saveContent, 500);
         });
 
-        // The "Quirk": Enter key behavior
+        function getLineBoundaries(value, start, end) {
+            let firstLineStart = value.lastIndexOf('\n', start - 1);
+            firstLineStart = firstLineStart === -1 ? 0 : firstLineStart + 1;
+
+            let lastLineEnd = value.indexOf('\n', end);
+            if (end > start && value[end - 1] === '\n') {
+                lastLineEnd = end - 1;
+            } else {
+                lastLineEnd = lastLineEnd === -1 ? value.length : lastLineEnd;
+            }
+            return { firstLineStart, lastLineEnd };
+        }
+
+        function moveLinesUp(notesArea) {
+            const value = notesArea.value;
+            const start = notesArea.selectionStart;
+            const end = notesArea.selectionEnd;
+
+            const { firstLineStart, lastLineEnd } = getLineBoundaries(value, start, end);
+
+            if (firstLineStart === 0) return;
+
+            let prevLineStart = value.lastIndexOf('\n', firstLineStart - 2);
+            prevLineStart = prevLineStart === -1 ? 0 : prevLineStart + 1;
+
+            const beforePrev = value.slice(0, prevLineStart);
+            const prevLine = value.slice(prevLineStart, firstLineStart - 1);
+            const selectedLines = value.slice(firstLineStart, lastLineEnd);
+            const afterSelected = value.slice(lastLineEnd);
+
+            notesArea.value = beforePrev + selectedLines + '\n' + prevLine + afterSelected;
+
+            notesArea.selectionStart = prevLineStart + (start - firstLineStart);
+            notesArea.selectionEnd = prevLineStart + (end - firstLineStart);
+            notesArea.dispatchEvent(new Event('input'));
+        }
+
+        function moveLinesDown(notesArea) {
+            const value = notesArea.value;
+            const start = notesArea.selectionStart;
+            const end = notesArea.selectionEnd;
+
+            const { firstLineStart, lastLineEnd } = getLineBoundaries(value, start, end);
+
+            if (lastLineEnd === value.length) return;
+
+            let nextLineEnd = value.indexOf('\n', lastLineEnd + 1);
+            nextLineEnd = nextLineEnd === -1 ? value.length : nextLineEnd;
+
+            const beforeSelected = value.slice(0, firstLineStart);
+            const selectedLines = value.slice(firstLineStart, lastLineEnd);
+            const nextLine = value.slice(lastLineEnd + 1, nextLineEnd);
+            const afterNext = value.slice(nextLineEnd);
+
+            notesArea.value = beforeSelected + nextLine + '\n' + selectedLines + afterNext;
+
+            const newSelectedStart = firstLineStart + nextLine.length + 1;
+            notesArea.selectionStart = newSelectedStart + (start - firstLineStart);
+            notesArea.selectionEnd = newSelectedStart + (end - firstLineStart);
+            notesArea.dispatchEvent(new Event('input'));
+        }
+
+        // The "Quirk": Enter key behavior and Move lines
         notesArea.addEventListener('keydown', (e) => {
+            if (e.shiftKey && e.altKey && e.key === 'ArrowUp') {
+                e.preventDefault();
+                moveLinesUp(notesArea);
+                return;
+            }
+            if (e.shiftKey && e.altKey && e.key === 'ArrowDown') {
+                e.preventDefault();
+                moveLinesDown(notesArea);
+                return;
+            }
+
             if (e.key === 'Enter') {
                 if (e.shiftKey) {
                     return; // Allow default behavior for Shift+Enter
