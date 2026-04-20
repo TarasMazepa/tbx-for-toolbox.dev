@@ -67,20 +67,47 @@
             position: relative;
         }
 
-        #notes {
+        #backdrop, #notes {
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
             height: 100%;
-            background: transparent;
             border: none;
             outline: none;
-            color: var(--text-color);
             font-family: var(--mono-family);
             font-size: 1.1rem;
             line-height: 1.6;
-            resize: none;
             padding: 1rem;
+            box-sizing: border-box;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            overflow-y: auto;
             scrollbar-width: thin;
             scrollbar-color: var(--muted-color) transparent;
+        }
+
+        #backdrop {
+            z-index: 1;
+            color: transparent;
+            pointer-events: none;
+            scrollbar-width: none; /* Hide scrollbar in Firefox */
+        }
+
+        /* Hide scrollbar on backdrop so it doesn't double up with notes */
+        #backdrop::-webkit-scrollbar {
+            width: 6px;
+            display: none; /* Hide scrollbar in webkit browsers */
+        }
+        #backdrop::-webkit-scrollbar-thumb {
+            background-color: transparent;
+        }
+
+        #notes {
+            z-index: 2;
+            background: transparent;
+            color: var(--text-color);
+            resize: none;
         }
 
         #notes::placeholder {
@@ -95,6 +122,39 @@
         #notes::-webkit-scrollbar-thumb {
             background-color: var(--muted-color);
             border-radius: 10px;
+        }
+
+        /* Line styles for backdrop */
+        .line {
+            position: relative;
+            min-height: 1.6em;
+            width: fit-content;
+            max-width: 100%;
+            border-radius: 4px;
+            pointer-events: none;
+        }
+
+        .line::before {
+            content: '';
+            position: absolute;
+            top: 2px;
+            bottom: 2px;
+            left: -4px;
+            right: -4px;
+            background-color: rgba(56, 189, 248, 0.1); /* very subtle accent color */
+            border-radius: 4px;
+            z-index: -1;
+            transition: opacity 0.2s ease;
+        }
+
+        /* Empty lines are invisible unless active */
+        .line.empty::before {
+            opacity: 0;
+        }
+
+        .line.empty.active::before {
+            opacity: 1;
+            background-color: rgba(56, 189, 248, 0.2);
         }
 
         .hint {
@@ -113,6 +173,7 @@
     </div>
 
     <div class="container">
+        <div id="backdrop"></div>
         <textarea id="notes" placeholder="Start typing... Press Enter to push content down."></textarea>
     </div>
 
@@ -245,6 +306,56 @@
                 notesArea.dispatchEvent(new Event('input'));
             }
         });
+
+        // Backdrop logic
+        const backdrop = document.getElementById('backdrop');
+
+        function updateBackdrop() {
+            const text = notesArea.value;
+            const lines = text.split('\n');
+
+            // Find which line the cursor is currently on
+            const cursorPosition = notesArea.selectionStart;
+            const textBeforeCursor = text.substring(0, cursorPosition);
+            const currentLineIndex = textBeforeCursor.split('\n').length - 1;
+
+            backdrop.innerHTML = lines.map((line, index) => {
+                const isEmpty = line === '';
+                const isActive = index === currentLineIndex;
+
+                // Add an empty space to preserve height for empty lines
+                let content = isEmpty ? ' ' : line;
+
+                // Escape HTML to prevent injection, only if not empty
+                if (!isEmpty) {
+                    content = content.replace(/&/g, '&amp;')
+                                     .replace(/</g, '&lt;')
+                                     .replace(/>/g, '&gt;');
+                }
+
+                let classes = 'line';
+                if (isEmpty) classes += ' empty';
+                if (isActive) classes += ' active';
+
+                return `<div class="${classes}">${content}</div>`;
+            }).join('');
+
+            // Sync scroll
+            backdrop.scrollTop = notesArea.scrollTop;
+            backdrop.scrollLeft = notesArea.scrollLeft;
+        }
+
+        ['input', 'keyup', 'click', 'focus', 'blur'].forEach(event => {
+            notesArea.addEventListener(event, updateBackdrop);
+        });
+
+        notesArea.addEventListener('scroll', () => {
+            backdrop.scrollTop = notesArea.scrollTop;
+            backdrop.scrollLeft = notesArea.scrollLeft;
+        });
+
+        // Initial render
+        updateBackdrop();
 
         // Initial focus
         notesArea.focus();
