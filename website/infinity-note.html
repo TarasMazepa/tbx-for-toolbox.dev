@@ -264,6 +264,28 @@
             notesArea.dispatchEvent(new Event('input'));
         }
 
+        function deleteSelectedLines(notesArea) {
+            const value = notesArea.value;
+            const start = notesArea.selectionStart;
+            const end = notesArea.selectionEnd;
+
+            const { firstLineStart, lastLineEnd } = getLineBoundaries(value, start, end);
+
+            let beforeSelected = value.slice(0, firstLineStart);
+            let afterSelected = value.slice(lastLineEnd);
+
+            // Handle newline removal so we don't leave an empty line
+            if (beforeSelected.endsWith('\n')) {
+                beforeSelected = beforeSelected.slice(0, -1);
+            } else if (afterSelected.startsWith('\n')) {
+                afterSelected = afterSelected.slice(1);
+            }
+
+            notesArea.value = beforeSelected + afterSelected;
+            notesArea.selectionStart = notesArea.selectionEnd = beforeSelected.length;
+            notesArea.dispatchEvent(new Event('input'));
+        }
+
         // The "Quirk": Enter key behavior and Move lines
         notesArea.addEventListener('keydown', (e) => {
             if (e.shiftKey && e.altKey && e.key === 'ArrowUp') {
@@ -274,6 +296,11 @@
             if (e.shiftKey && e.altKey && e.key === 'ArrowDown') {
                 e.preventDefault();
                 moveLinesDown(notesArea);
+                return;
+            }
+            if ((e.metaKey || e.ctrlKey) && e.key === 'Backspace') {
+                e.preventDefault();
+                deleteSelectedLines(notesArea);
                 return;
             }
 
