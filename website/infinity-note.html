@@ -317,15 +317,12 @@
                         currentLineEnd = value.length;
                     }
 
-                    // Insert newline at the end of the current line
-                    const newValue = value.slice(0, currentLineEnd) + '\n' + value.slice(currentLineEnd);
-                    notesArea.value = newValue;
+                    notesArea.setSelectionRange(currentLineEnd, currentLineEnd);
+                    document.execCommand('insertText', false, '\n');
 
-                    // Move cursor to the new line
-                    notesArea.selectionStart = notesArea.selectionEnd = currentLineEnd + 1;
-
-                    // Trigger auto-save
-                    notesArea.dispatchEvent(new Event('input'));
+                    setTimeout(() => {
+                        notesArea.dispatchEvent(new Event('input'));
+                    }, 0);
                     return;
                 }
 
@@ -340,15 +337,13 @@
                 // If lastIndexOf is -1, it means we're on the first line
                 currentLineStart = currentLineStart === -1 ? 0 : currentLineStart + 1;
 
-                // Insert newline at the beginning of the current line
-                const newValue = value.slice(0, currentLineStart) + '\n' + value.slice(currentLineStart);
-                notesArea.value = newValue;
-
-                // Move cursor to the new line
-                notesArea.selectionStart = notesArea.selectionEnd = currentLineStart;
+                notesArea.setSelectionRange(currentLineStart, currentLineStart);
+                document.execCommand('insertText', false, '\n');
                 
-                // Trigger auto-save
-                notesArea.dispatchEvent(new Event('input'));
+                setTimeout(() => {
+                    notesArea.setSelectionRange(currentLineStart, currentLineStart);
+                    notesArea.dispatchEvent(new Event('input'));
+                }, 0);
             }
         });
 
