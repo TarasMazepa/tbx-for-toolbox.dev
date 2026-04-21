@@ -279,7 +279,27 @@
 
             if (e.key === 'Enter') {
                 if (e.shiftKey) {
-                    return; // Allow default behavior for Shift+Enter
+                    e.preventDefault();
+
+                    const end = notesArea.selectionEnd;
+                    const value = notesArea.value;
+
+                    // Find the end of the current line
+                    let currentLineEnd = value.indexOf('\n', end);
+                    if (currentLineEnd === -1) {
+                        currentLineEnd = value.length;
+                    }
+
+                    // Insert newline at the end of the current line
+                    const newValue = value.slice(0, currentLineEnd) + '\n' + value.slice(currentLineEnd);
+                    notesArea.value = newValue;
+
+                    // Move cursor to the new line
+                    notesArea.selectionStart = notesArea.selectionEnd = currentLineEnd + 1;
+
+                    // Trigger auto-save
+                    notesArea.dispatchEvent(new Event('input'));
+                    return;
                 }
 
                 e.preventDefault();
