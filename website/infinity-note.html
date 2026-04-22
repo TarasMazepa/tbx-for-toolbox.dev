@@ -48,6 +48,12 @@
             color: var(--accent-color);
         }
 
+        .status-container {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
         .status {
             font-size: 0.875rem;
             color: var(--muted-color);
@@ -57,6 +63,136 @@
         .status.saving {
             opacity: 1;
             color: var(--accent-color);
+        }
+
+        .info-btn {
+            background: none;
+            border: 1px solid var(--muted-color);
+            color: var(--muted-color);
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: var(--font-family);
+        }
+
+        .info-btn:hover {
+            color: var(--accent-color);
+            border-color: var(--accent-color);
+            background: rgba(56, 189, 248, 0.1);
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .modal.show {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal-content {
+            background-color: var(--bg-color);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            width: 90%;
+            max-width: 450px;
+            padding: 2rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+            transform: translateY(20px);
+            transition: transform 0.2s ease;
+        }
+
+        .modal.show .modal-content {
+            transform: translateY(0);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-header h2 {
+            font-size: 1.25rem;
+            color: var(--accent-color);
+            font-weight: 600;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: var(--muted-color);
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: color 0.2s ease;
+            padding: 0.25rem;
+            line-height: 1;
+        }
+
+        .close-btn:hover {
+            color: var(--text-color);
+        }
+
+        .modal-body p {
+            margin-bottom: 1.5rem;
+            color: var(--text-color);
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .shortcuts-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .shortcuts-list li {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 0.75rem;
+        }
+
+        .shortcuts-list li:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .shortcuts-list kbd {
+            background-color: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            padding: 0.2rem 0.5rem;
+            font-family: var(--font-family);
+            font-size: 0.8rem;
+            color: var(--accent-color);
+        }
+
+        .shortcuts-list span {
+            color: var(--muted-color);
         }
 
         .container {
@@ -167,7 +303,29 @@
 <body>
     <div class="header">
         <div class="title">infinity note</div>
-        <div id="status" class="status">All changes saved.</div>
+        <div class="status-container">
+            <div id="status" class="status">All changes saved.</div>
+            <button id="info-btn" class="info-btn" aria-label="Show shortcuts">?</button>
+        </div>
+    </div>
+
+    <div id="info-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Shortcuts & Behavior</h2>
+                <button id="close-btn" class="close-btn" aria-label="Close modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Infinity Note has a unique top-down entry flow.</p>
+                <ul class="shortcuts-list">
+                    <li><kbd>Enter</kbd> <span>Insert line at top of current block</span></li>
+                    <li><kbd>Shift</kbd> + <kbd>Enter</kbd> <span>Regular new line</span></li>
+                    <li><kbd>Shift</kbd> + <kbd>Alt</kbd> + <kbd>↑</kbd> <span>Move line(s) up</span></li>
+                    <li><kbd>Shift</kbd> + <kbd>Alt</kbd> + <kbd>↓</kbd> <span>Move line(s) down</span></li>
+                    <li><kbd>Cmd/Ctrl</kbd> + <kbd>Backspace</kbd> <span>Delete selected line(s)</span></li>
+                </ul>
+            </div>
+        </div>
     </div>
 
     <div class="container">
@@ -413,6 +571,27 @@
         notesArea.addEventListener('scroll', () => {
             backdrop.scrollTop = notesArea.scrollTop;
             backdrop.scrollLeft = notesArea.scrollLeft;
+        });
+
+        // Modal Logic
+        const infoBtn = document.getElementById('info-btn');
+        const closeBtn = document.getElementById('close-btn');
+        const infoModal = document.getElementById('info-modal');
+
+        infoBtn.addEventListener('click', () => {
+            infoModal.classList.add('show');
+        });
+
+        closeBtn.addEventListener('click', () => {
+            infoModal.classList.remove('show');
+            notesArea.focus();
+        });
+
+        infoModal.addEventListener('click', (e) => {
+            if (e.target === infoModal) {
+                infoModal.classList.remove('show');
+                notesArea.focus();
+            }
         });
 
         // Initial render
