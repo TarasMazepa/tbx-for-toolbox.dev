@@ -305,18 +305,46 @@
             }
 
             if (e.key === 'Enter') {
+                e.preventDefault();
+
+                const start = notesArea.selectionStart;
+                const end = notesArea.selectionEnd;
+                const value = notesArea.value;
+
+                let currentLineEnd = value.indexOf('\n', end);
+                if (currentLineEnd === -1) {
+                    currentLineEnd = value.length;
+                }
+
+                const hasSelection = start !== end;
+                const isAtEndOfLine = end === currentLineEnd;
+
+                if (hasSelection || !isAtEndOfLine) {
+                    // Regular Enter behavior
+                    document.execCommand('insertText', false, '\n');
+
+                    setTimeout(() => {
+                        if (e.shiftKey) {
+                            // Move to end of the newly created next line
+                            const newValue = notesArea.value;
+                            const newStart = notesArea.selectionStart; // After inserting \n, cursor is at start of next line
+                            let nextLineEnd = newValue.indexOf('\n', newStart);
+                            if (nextLineEnd === -1) {
+                                nextLineEnd = newValue.length;
+                            }
+                            notesArea.setSelectionRange(nextLineEnd, nextLineEnd);
+                        } else {
+                            // Move cursor to end of the current line (which is now right before the \n we inserted)
+                            const newStart = notesArea.selectionStart; // Currently at start of next line
+                            notesArea.setSelectionRange(newStart - 1, newStart - 1);
+                        }
+                        notesArea.dispatchEvent(new Event('input'));
+                    }, 0);
+                    return;
+                }
+
+                // Infinity note behavior for cursor exactly at the end of the line
                 if (e.shiftKey) {
-                    e.preventDefault();
-
-                    const end = notesArea.selectionEnd;
-                    const value = notesArea.value;
-
-                    // Find the end of the current line
-                    let currentLineEnd = value.indexOf('\n', end);
-                    if (currentLineEnd === -1) {
-                        currentLineEnd = value.length;
-                    }
-
                     notesArea.setSelectionRange(currentLineEnd, currentLineEnd);
                     document.execCommand('insertText', false, '\n');
 
@@ -326,15 +354,8 @@
                     return;
                 }
 
-                e.preventDefault();
-
-                const start = notesArea.selectionStart;
-                const value = notesArea.value;
-
                 // Find the start of the current line
                 let currentLineStart = value.lastIndexOf('\n', start - 1);
-                
-                // If lastIndexOf is -1, it means we're on the first line
                 currentLineStart = currentLineStart === -1 ? 0 : currentLineStart + 1;
 
                 notesArea.setSelectionRange(currentLineStart, currentLineStart);
