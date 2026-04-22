@@ -298,6 +298,40 @@
             color: var(--muted-color);
             opacity: 0.6;
         }
+
+        .add-btn-wrapper {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 0.5rem;
+            position: relative;
+            z-index: 10;
+        }
+
+        .add-btn {
+            background-color: transparent;
+            color: var(--muted-color);
+            border: 1px dashed var(--muted-color);
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            line-height: 1;
+            padding: 0 0 2px 0;
+            opacity: 0.7;
+        }
+
+        .add-btn:hover {
+            color: var(--accent-color);
+            border-color: var(--accent-color);
+            background-color: rgba(56, 189, 248, 0.1);
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
@@ -326,6 +360,10 @@
                 </ul>
             </div>
         </div>
+    </div>
+
+    <div class="add-btn-wrapper">
+        <button id="add-btn" class="add-btn" aria-label="Add line">+</button>
     </div>
 
     <div class="container">
@@ -593,6 +631,26 @@
                 notesArea.focus();
             }
         });
+
+        // Plus Button Logic
+        const addBtn = document.getElementById('add-btn');
+        if (addBtn) {
+            addBtn.addEventListener('click', () => {
+                notesArea.focus();
+                const isEmptyFirstLine = notesArea.value === '' || notesArea.value.startsWith('\n');
+
+                if (isEmptyFirstLine) {
+                    notesArea.setSelectionRange(0, 0);
+                } else {
+                    notesArea.setSelectionRange(0, 0);
+                    document.execCommand('insertText', false, '\n');
+                    setTimeout(() => {
+                        notesArea.setSelectionRange(0, 0);
+                        notesArea.dispatchEvent(new Event('input'));
+                    }, 0);
+                }
+            });
+        }
 
         // Initial render
         updateBackdrop();
