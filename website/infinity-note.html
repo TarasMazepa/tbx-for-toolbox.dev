@@ -379,10 +379,29 @@
         let saveTimeout;
 
         // Load content
-        const savedContent = localStorage.getItem('infinity_notes');
-        if (savedContent) {
-            notesArea.value = savedContent;
+        function loadContent() {
+            const savedContent = localStorage.getItem('infinity_notes') || '';
+            if (notesArea.value !== savedContent) {
+                notesArea.value = savedContent;
+                if (typeof updateBackdrop === 'function') {
+                    updateBackdrop();
+                }
+            }
         }
+
+        loadContent();
+
+        window.addEventListener('focus', loadContent);
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                loadContent();
+            }
+        });
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'infinity_notes') {
+                loadContent();
+            }
+        });
 
         // Auto-save logic
         function saveContent() {
