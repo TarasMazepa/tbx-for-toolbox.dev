@@ -378,9 +378,18 @@
         const statusEl = document.getElementById('status');
         let saveTimeout;
 
+        // Migrate old data if present
+        const oldContent = localStorage.getItem('infinity_notes');
+        if (oldContent !== null) {
+            if (localStorage.getItem('infinity-note') === null) {
+                localStorage.setItem('infinity-note', oldContent);
+            }
+            localStorage.removeItem('infinity_notes');
+        }
+
         // Load content
         function loadContent() {
-            const savedContent = localStorage.getItem('infinity_notes') || '';
+            const savedContent = localStorage.getItem('infinity-note') || '';
             if (notesArea.value !== savedContent) {
                 notesArea.value = savedContent;
                 if (typeof updateBackdrop === 'function') {
@@ -398,14 +407,14 @@
             }
         });
         window.addEventListener('storage', (e) => {
-            if (e.key === 'infinity_notes') {
+            if (e.key === 'infinity-note') {
                 loadContent();
             }
         });
 
         // Auto-save logic
         function saveContent() {
-            localStorage.setItem('infinity_notes', notesArea.value);
+            localStorage.setItem('infinity-note', notesArea.value);
             statusEl.textContent = 'All changes saved.';
             statusEl.classList.remove('saving');
         }
