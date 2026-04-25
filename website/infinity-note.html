@@ -389,6 +389,7 @@
         const statusEl = document.getElementById('status');
         const backdrop = document.getElementById('backdrop');
         let saveTimeout;
+        let savingStatusTimeout;
 
         // Migrate old data if present
         const oldContent = localStorage.getItem('infinity_notes');
@@ -426,15 +427,21 @@
 
         // Auto-save logic
         function saveContent() {
+            clearTimeout(savingStatusTimeout);
             localStorage.setItem('infinity-note', notesArea.value);
             statusEl.textContent = 'All changes saved.';
             statusEl.classList.remove('saving');
         }
 
         notesArea.addEventListener('input', () => {
-            statusEl.textContent = 'Saving...';
-            statusEl.classList.add('saving');
             clearTimeout(saveTimeout);
+            clearTimeout(savingStatusTimeout);
+
+            savingStatusTimeout = setTimeout(() => {
+                statusEl.textContent = 'Saving...';
+                statusEl.classList.add('saving');
+            }, 300);
+
             saveTimeout = setTimeout(saveContent, 500);
         });
 
