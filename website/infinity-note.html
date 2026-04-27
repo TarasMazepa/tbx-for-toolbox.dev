@@ -343,12 +343,45 @@
             background-color: rgba(178, 148, 187, 0.1);
             opacity: 1;
         }
+
+        @media (max-width: 600px) {
+            :root {
+                --h-padding: 1rem;
+                --v-padding: 1.5rem;
+            }
+            .header {
+                padding-top: max(var(--v-padding), env(safe-area-inset-top));
+                flex-wrap: nowrap;
+                gap: 0.5rem;
+            }
+            .title {
+                font-size: 1.1rem;
+                white-space: nowrap;
+            }
+            .status-container {
+                gap: 0.5rem;
+            }
+            .status {
+                font-size: 0.75rem;
+                white-space: nowrap;
+                display: none;
+            }
+            .status.saving {
+                display: block;
+            }
+            .add-btn {
+                width: 24px;
+                height: 24px;
+                font-size: 1.2rem;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="header">
         <div class="title">infinity note</div>
         <div class="status-container">
+            <button id="add-btn" class="add-btn" aria-label="Add line">+</button>
             <div id="status" class="status">All changes saved.</div>
             <button id="info-btn" class="info-btn" aria-label="Show shortcuts">?</button>
         </div>
@@ -371,10 +404,6 @@
                 </ul>
             </div>
         </div>
-    </div>
-
-    <div class="add-btn-wrapper">
-        <button id="add-btn" class="add-btn" aria-label="Add line">+</button>
     </div>
 
     <div class="container">
