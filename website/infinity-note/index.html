@@ -382,6 +382,10 @@
     <div class="header">
         <div class="title">infinity note</div>
         <div class="status-container">
+            <button id="move-top-btn" class="add-btn" aria-label="Move to top">⇈</button>
+            <button id="move-up-btn" class="add-btn" aria-label="Move up">↑</button>
+            <button id="move-down-btn" class="add-btn" aria-label="Move down">↓</button>
+            <button id="move-bottom-btn" class="add-btn" aria-label="Move to bottom">⇊</button>
             <button id="add-btn" class="add-btn" aria-label="Add line">+</button>
             <div id="status" class="status">All changes saved.</div>
             <button id="info-btn" class="info-btn" aria-label="Show shortcuts">?</button>
@@ -776,6 +780,39 @@
                         notesArea.dispatchEvent(new Event('input'));
                     }, 0);
                 }
+            });
+        }
+
+        // Movement Buttons Logic
+        const moveTopBtn = document.getElementById('move-top-btn');
+        if (moveTopBtn) {
+            moveTopBtn.addEventListener('click', () => {
+                notesArea.focus();
+                moveLinesToTop(notesArea);
+            });
+        }
+
+        const moveUpBtn = document.getElementById('move-up-btn');
+        if (moveUpBtn) {
+            moveUpBtn.addEventListener('click', () => {
+                notesArea.focus();
+                moveLinesUp(notesArea);
+            });
+        }
+
+        const moveDownBtn = document.getElementById('move-down-btn');
+        if (moveDownBtn) {
+            moveDownBtn.addEventListener('click', () => {
+                notesArea.focus();
+                moveLinesDown(notesArea);
+            });
+        }
+
+        const moveBottomBtn = document.getElementById('move-bottom-btn');
+        if (moveBottomBtn) {
+            moveBottomBtn.addEventListener('click', () => {
+                notesArea.focus();
+                moveLinesToBottom(notesArea);
             });
         }
 
