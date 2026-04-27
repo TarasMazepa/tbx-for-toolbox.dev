@@ -1,0 +1,9 @@
+{
+  "name": "Infinity Note",
+  "short_name": "Infinity Note",
+  "display": "standalone",
+  "start_url": "/infinity-note/",
+  "scope": "/infinity-note/",
+  "background_color": "#1e1d27",
+  "theme_color": "#1e1d27"
+}
