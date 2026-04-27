@@ -401,6 +401,8 @@
                     <li><kbd>Shift</kbd> + <kbd>Enter</kbd> <span>Regular new line</span></li>
                     <li><kbd>Shift</kbd> + <kbd>Alt</kbd> + <kbd>↑</kbd> <span>Move line(s) up</span></li>
                     <li><kbd>Shift</kbd> + <kbd>Alt</kbd> + <kbd>↓</kbd> <span>Move line(s) down</span></li>
+                    <li><kbd>Cmd/Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Alt</kbd> + <kbd>↑</kbd> <span>Move line(s) to top</span></li>
+                    <li><kbd>Cmd/Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Alt</kbd> + <kbd>↓</kbd> <span>Move line(s) to bottom</span></li>
                     <li><kbd>Cmd/Ctrl</kbd> + <kbd>Backspace</kbd> <span>Delete selected line(s)</span></li>
                 </ul>
             </div>
@@ -537,6 +539,46 @@
             notesArea.dispatchEvent(new Event('input'));
         }
 
+        function moveLinesToTop(notesArea) {
+            const value = notesArea.value;
+            const start = notesArea.selectionStart;
+            const end = notesArea.selectionEnd;
+
+            const { firstLineStart, lastLineEnd } = getLineBoundaries(value, start, end);
+            if (firstLineStart === 0) return;
+
+            const beforeSelected = value.slice(0, firstLineStart - 1);
+            const selectedLines = value.slice(firstLineStart, lastLineEnd);
+            const afterSelected = value.slice(lastLineEnd);
+
+            notesArea.value = selectedLines + '\n' + beforeSelected + afterSelected;
+
+            const newStart = start - firstLineStart;
+            notesArea.selectionStart = newStart;
+            notesArea.selectionEnd = newStart + (end - start);
+            notesArea.dispatchEvent(new Event('input'));
+        }
+
+        function moveLinesToBottom(notesArea) {
+            const value = notesArea.value;
+            const start = notesArea.selectionStart;
+            const end = notesArea.selectionEnd;
+
+            const { firstLineStart, lastLineEnd } = getLineBoundaries(value, start, end);
+            if (lastLineEnd === value.length) return;
+
+            const beforeSelected = value.slice(0, firstLineStart);
+            const selectedLines = value.slice(firstLineStart, lastLineEnd);
+            const afterSelected = value.slice(lastLineEnd + 1);
+
+            notesArea.value = beforeSelected + afterSelected + '\n' + selectedLines;
+
+            const newSelectedStart = notesArea.value.length - (lastLineEnd - firstLineStart);
+            notesArea.selectionStart = newSelectedStart + (start - firstLineStart);
+            notesArea.selectionEnd = newSelectedStart + (end - firstLineStart);
+            notesArea.dispatchEvent(new Event('input'));
+        }
+
         function deleteSelectedLines(notesArea) {
             const value = notesArea.value;
             const start = notesArea.selectionStart;
@@ -561,6 +603,16 @@
 
         // The "Quirk": Enter key behavior and Move lines
         notesArea.addEventListener('keydown', (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.altKey && e.key === 'ArrowUp') {
+                e.preventDefault();
+                moveLinesToTop(notesArea);
+                return;
+            }
+            if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.altKey && e.key === 'ArrowDown') {
+                e.preventDefault();
+                moveLinesToBottom(notesArea);
+                return;
+            }
             if (e.shiftKey && e.altKey && e.key === 'ArrowUp') {
                 e.preventDefault();
                 moveLinesUp(notesArea);
