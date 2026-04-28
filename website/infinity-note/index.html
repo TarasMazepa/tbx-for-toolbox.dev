@@ -386,6 +386,9 @@
             <button id="move-up-btn" class="add-btn" aria-label="Move up">↑</button>
             <button id="move-down-btn" class="add-btn" aria-label="Move down">↓</button>
             <button id="move-bottom-btn" class="add-btn" aria-label="Move to bottom">⇊</button>
+            <button id="undo-btn" class="add-btn" aria-label="Undo">↶</button>
+            <button id="redo-btn" class="add-btn" aria-label="Redo">↷</button>
+            <button id="delete-line-btn" class="add-btn" aria-label="Delete line">🗑</button>
             <button id="add-btn" class="add-btn" aria-label="Add line">+</button>
             <div id="status" class="status">All changes saved.</div>
             <button id="info-btn" class="info-btn" aria-label="Show shortcuts">?</button>
@@ -590,19 +593,22 @@
 
             const { firstLineStart, lastLineEnd } = getLineBoundaries(value, start, end);
 
-            let beforeSelected = value.slice(0, firstLineStart);
-            let afterSelected = value.slice(lastLineEnd);
+            let deleteStart = firstLineStart;
+            let deleteEnd = lastLineEnd;
 
             // Handle newline removal so we don't leave an empty line
-            if (beforeSelected.endsWith('\n')) {
-                beforeSelected = beforeSelected.slice(0, -1);
-            } else if (afterSelected.startsWith('\n')) {
-                afterSelected = afterSelected.slice(1);
+            if (deleteStart > 0 && value[deleteStart - 1] === '\n') {
+                deleteStart -= 1;
+            } else if (deleteEnd < value.length && value[deleteEnd] === '\n') {
+                deleteEnd += 1;
             }
 
-            notesArea.value = beforeSelected + afterSelected;
-            notesArea.selectionStart = notesArea.selectionEnd = beforeSelected.length;
-            notesArea.dispatchEvent(new Event('input'));
+            notesArea.setSelectionRange(deleteStart, deleteEnd);
+            document.execCommand('insertText', false, '');
+
+            setTimeout(() => {
+                notesArea.dispatchEvent(new Event('input'));
+            }, 0);
         }
 
         // The "Quirk": Enter key behavior and Move lines
@@ -813,6 +819,30 @@
             moveBottomBtn.addEventListener('click', () => {
                 notesArea.focus();
                 moveLinesToBottom(notesArea);
+            });
+        }
+
+        const undoBtn = document.getElementById('undo-btn');
+        if (undoBtn) {
+            undoBtn.addEventListener('click', () => {
+                notesArea.focus();
+                document.execCommand('undo');
+            });
+        }
+
+        const redoBtn = document.getElementById('redo-btn');
+        if (redoBtn) {
+            redoBtn.addEventListener('click', () => {
+                notesArea.focus();
+                document.execCommand('redo');
+            });
+        }
+
+        const deleteLineBtn = document.getElementById('delete-line-btn');
+        if (deleteLineBtn) {
+            deleteLineBtn.addEventListener('click', () => {
+                notesArea.focus();
+                deleteSelectedLines(notesArea);
             });
         }
 
