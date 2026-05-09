@@ -145,6 +145,10 @@
                 <h2>Walmart Delivery Checklist</h2>
                 <p>Print a compact checklist to verify delivered items from a Walmart order.</p>
             </a>
+            <a id="bm-walmart-checklist-v2" href="#" class="card">
+                <h2>Walmart Delivery Checklist v2</h2>
+                <p>Print a compact checklist to verify delivered items from a Walmart order.</p>
+            </a>
         </div>
 
         <div class="footer-links">
@@ -161,7 +165,8 @@
             async function loadBookmarklets() {
                 const bms = [
                     { id: 'bm-walmart-calendar', file: 'bookmarklets/walmart-subscription-calendar.js' },
-                    { id: 'bm-walmart-checklist', file: 'bookmarklets/walmart-delivery-checklist.js' }
+                    { id: 'bm-walmart-checklist', file: 'bookmarklets/walmart-delivery-checklist.js' },
+                    { id: 'bm-walmart-checklist-v2', file: 'bookmarklets/walmart-delivery-checklist-v2.js' }
                 ];
 
                 for (const bm of bms) {
