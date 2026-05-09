@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>tbx is for toolbox</title>
+    <script src="https://cdn.jsdelivr.net/npm/terser/dist/bundle.min.js"></script>
     <style>
         :root {
             --bg-color: #1e1d27;
@@ -162,7 +163,7 @@
         </div>
 
         <script>
-            function loadBookmarklets() {
+            async function loadBookmarklets() {
                 const bms = [
                     { id: 'bm-walmart-calendar', file: 'bookmarklets/walmart-subscription-calendar.js' },
                     { id: 'bm-walmart-checklist', file: 'bookmarklets/walmart-delivery-checklist.js' },
@@ -172,7 +173,35 @@
                 for (const bm of bms) {
                     const el = document.getElementById(bm.id);
                     if (el) {
-                        el.href = "javascript:(function(){let s=document.createElement('script');s.onerror=function(){alert('Failed to load bookmarklet')};s.src='https://raw.githubusercontent.com/TarasMazepa/tbx-for-toolbox.dev/main/website/" + bm.file + "?v=' + Date.now();document.head.appendChild(s);})();";
+                        const h2 = el.querySelector('h2');
+                        const originalText = h2 ? h2.textContent : '';
+
+                        // Set loading state
+                        if (h2) h2.textContent = 'Compiling...';
+                        el.draggable = false;
+                        el.style.pointerEvents = 'none';
+                        el.style.opacity = '0.7';
+
+                        try {
+                            const response = await fetch(bm.file);
+                            const rawCode = await response.text();
+
+                            const minifiedCode = await Terser.minify(rawCode, {
+                                compress: { drop_console: true },
+                                format: { comments: false }
+                            });
+
+                            el.href = "javascript:" + encodeURIComponent(minifiedCode.code);
+                        } catch (e) {
+                            console.error('Failed to compile bookmarklet ' + bm.id, e);
+                            if (h2) h2.textContent = 'Error compiling';
+                        } finally {
+                            // Restore state
+                            if (h2 && h2.textContent === 'Compiling...') h2.textContent = originalText;
+                            el.draggable = true;
+                            el.style.pointerEvents = '';
+                            el.style.opacity = '';
+                        }
                     }
                 }
             }
