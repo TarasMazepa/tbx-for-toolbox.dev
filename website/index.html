@@ -172,7 +172,7 @@
                 for (const bm of bms) {
                     const el = document.getElementById(bm.id);
                     if (el) {
-                        el.href = "javascript:(function(){let s=document.createElement('script');s.src='https://raw.githubusercontent.com/TarasMazepa/tbx-for-toolbox.dev/main/website/" + bm.file + "?v=' + Date.now();document.head.appendChild(s);})();";
+                        el.href = "javascript:(function(){let s=document.createElement('script');s.onerror=function(){alert('Failed to load bookmarklet')};s.src='https://raw.githubusercontent.com/TarasMazepa/tbx-for-toolbox.dev/main/website/" + bm.file + "?v=' + Date.now();document.head.appendChild(s);})();";
                     }
                 }
             }
