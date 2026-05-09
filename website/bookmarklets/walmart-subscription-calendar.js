@@ -58,18 +58,68 @@
         return;
     }
 
-    // Sort items (Soonest Date -> Smallest Frequency -> Alphabetical)
+    const currentYear = new Date().getFullYear();
+    let today = new Date();
+    today.setHours(0,0,0,0);
+
+    // Pre-calculate all dates for each item (backwards and forwards) BEFORE sorting
     items.forEach(item => {
-        item.dateObj = new Date(`${item.date} 2026`);
-        item.freqDays = 9999;
+        item.dateObj = new Date(`${item.date} ${currentYear}`);
+        item.allDates = [];
+
         let match = item.freq.match(/every\s+(\d+)?\s*(week|month)s?/i);
+        item.freqDays = 9999;
+
         if (match) {
             let amount = parseInt(match[1]) || 1;
             let unit = match[2].toLowerCase();
             item.freqDays = (unit === 'week') ? amount * 7 : amount * 30;
+
+            // Backwards extrapolation
+            let backDate = new Date(item.dateObj.getTime());
+            for(let i = 0; i < 20; i++) {
+                if (unit === 'week') {
+                    backDate.setDate(backDate.getDate() - (amount * 7));
+                } else if (unit === 'month') {
+                    backDate.setMonth(backDate.getMonth() - amount);
+                }
+
+                if (backDate >= today) {
+                    let m = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][backDate.getMonth()];
+                    let d = backDate.getDate().toString().padStart(2, '0');
+                    item.allDates.unshift(`${m} ${d}`);
+                } else {
+                    break;
+                }
+            }
+        }
+
+        // Base date
+        let mBase = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][item.dateObj.getMonth()];
+        let dBase = item.dateObj.getDate().toString().padStart(2, '0');
+        item.allDates.push(`${mBase} ${dBase}`);
+
+        // Forwards extrapolation
+        if (match) {
+            let amount = parseInt(match[1]) || 1;
+            let unit = match[2].toLowerCase();
+            let fwdDate = new Date(item.dateObj.getTime());
+
+            for(let i = 0; i < 10; i++) {
+                if (unit === 'week') {
+                    fwdDate.setDate(fwdDate.getDate() + (amount * 7));
+                } else if (unit === 'month') {
+                    fwdDate.setMonth(fwdDate.getMonth() + amount);
+                }
+
+                let m = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][fwdDate.getMonth()];
+                let d = fwdDate.getDate().toString().padStart(2, '0');
+                item.allDates.push(`${m} ${d}`);
+            }
         }
     });
 
+    // Sort items (Soonest Date -> Smallest Frequency -> Alphabetical)
     items.sort((a, b) => {
         if (a.dateObj.getTime() !== b.dateObj.getTime()) return a.dateObj - b.dateObj;
         if (a.freqDays !== b.freqDays) return a.freqDays - b.freqDays;
@@ -77,48 +127,24 @@
     });
 
     // Determine the column headers
-    let uniqueDates = [...new Set(items.map(i => i.date))];
-    uniqueDates.sort((a, b) => new Date(`${a} 2026`) - new Date(`${b} 2026`));
+    let allExtrapolatedDates = items.flatMap(i => i.allDates);
+    let uniqueDates = [...new Set(allExtrapolatedDates)];
+    uniqueDates.sort((a, b) => new Date(`${a} ${currentYear}`) - new Date(`${b} ${currentYear}`));
+
+    // Filter out past dates for the columns
+    uniqueDates = uniqueDates.filter(d => new Date(`${d} ${currentYear}`) >= today);
 
     let maxCols = 5;
     let colDates = uniqueDates.slice(0, maxCols);
-    let maxDateObj = new Date(`${colDates[colDates.length - 1]} 2026`);
+    let maxDateObj = new Date(`${colDates[colDates.length - 1]} ${currentYear}`);
 
-    // Calculate recurring dates for each item
+    // Calculate Later Dates
     items.forEach(item => {
-        item.allDates = [item.date];
         item.nextAfterMax = '';
-
-        if (item.dateObj > maxDateObj) {
-            item.nextAfterMax = item.date;
-        }
-
-        let match = item.freq.match(/every\s+(\d+)?\s*(week|month)s?/i);
-        if (match) {
-            let amount = parseInt(match[1]) || 1;
-            let unit = match[2].toLowerCase();
-
-            let currDate = new Date(item.dateObj.getTime());
-
-            for(let i = 0; i < 20; i++) {
-                if (unit === 'week') {
-                    currDate.setDate(currDate.getDate() + (amount * 7));
-                } else if (unit === 'month') {
-                    currDate.setMonth(currDate.getMonth() + amount);
-                }
-
-                let m = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][currDate.getMonth()];
-                let d = currDate.getDate().toString().padStart(2, '0');
-                let formattedDate = `${m} ${d}`;
-
-                if (currDate > maxDateObj) {
-                    if (!item.nextAfterMax) {
-                        item.nextAfterMax = formattedDate;
-                    }
-                    break;
-                } else {
-                    item.allDates.push(formattedDate);
-                }
+        for (let d of item.allDates) {
+            if (new Date(`${d} ${currentYear}`) > maxDateObj) {
+                item.nextAfterMax = d;
+                break;
             }
         }
     });
