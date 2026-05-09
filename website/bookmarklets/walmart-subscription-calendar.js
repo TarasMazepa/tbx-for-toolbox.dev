@@ -94,7 +94,8 @@
                 if (backDate >= today) {
                     let m = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][backDate.getMonth()];
                     let d = backDate.getDate().toString().padStart(2, '0');
-                    item.allDates.unshift(`${m} ${d}`);
+                    let y = backDate.getFullYear();
+                    item.allDates.unshift(`${m} ${d} ${y}`);
                 } else {
                     break;
                 }
@@ -104,7 +105,8 @@
         // Base date
         let mBase = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][item.dateObj.getMonth()];
         let dBase = item.dateObj.getDate().toString().padStart(2, '0');
-        item.allDates.push(`${mBase} ${dBase}`);
+        let yBase = item.dateObj.getFullYear();
+        item.allDates.push(`${mBase} ${dBase} ${yBase}`);
 
         // Forwards extrapolation
         if (match) {
@@ -123,7 +125,8 @@
 
                 let m = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][fwdDate.getMonth()];
                 let d = fwdDate.getDate().toString().padStart(2, '0');
-                item.allDates.push(`${m} ${d}`);
+                let y = fwdDate.getFullYear();
+                item.allDates.push(`${m} ${d} ${y}`);
             }
         }
 
@@ -141,20 +144,20 @@
     // Determine the column headers
     let allExtrapolatedDates = items.flatMap(i => i.allDates);
     let uniqueDates = [...new Set(allExtrapolatedDates)];
-    uniqueDates.sort((a, b) => new Date(`${a} ${currentYear}`) - new Date(`${b} ${currentYear}`));
+    uniqueDates.sort((a, b) => new Date(a) - new Date(b));
 
     // Filter out past dates for the columns
-    uniqueDates = uniqueDates.filter(d => new Date(`${d} ${currentYear}`) >= today);
+    uniqueDates = uniqueDates.filter(d => new Date(d) >= today);
 
     let maxCols = 5;
     let colDates = uniqueDates.slice(0, maxCols);
-    let maxDateObj = new Date(`${colDates[colDates.length - 1]} ${currentYear}`);
+    let maxDateObj = new Date(colDates[colDates.length - 1]);
 
     // Calculate Later Dates
     items.forEach(item => {
         item.nextAfterMax = '';
         for (let d of item.allDates) {
-            if (new Date(`${d} ${currentYear}`) > maxDateObj) {
+            if (new Date(d) > maxDateObj) {
                 item.nextAfterMax = d;
                 break;
             }
@@ -198,7 +201,7 @@
           <tr>
             <th style="text-align: left; width: 50%;">Item</th>`;
 
-    colDates.forEach(d => html += `<th style="width: 8%;">${d}</th>`);
+    colDates.forEach(d => { let displayDate = d.split(' ').slice(0, 2).join(' '); html += `<th style="width: 8%;">${displayDate}</th>`; });
 
     html += `       <th style="width: 10%;">Later Dates</th>
           </tr>
@@ -220,7 +223,7 @@
       });
 
       if(item.nextAfterMax) {
-        html += `<td style="color: #555; font-weight: 500;">${item.nextAfterMax}</td>`;
+        html += `<td style="color: #555; font-weight: 500;">${item.nextAfterMax.split(' ').slice(0, 2).join(' ')}</td>`;
       } else {
         html += `<td></td>`;
       }
