@@ -127,69 +127,74 @@
     let html = `
     <html>
     <head>
-        <title>Walmart Subscription Calendar</title>
-        <style>
-            body { font-family: 'Bogle', 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 30px; color: #2e2f32; max-width: 1000px; margin: 0 auto; }
-            h1 { color: #0071ce; margin-bottom: 20px; font-size: 26px; border-bottom: 3px solid #0071ce; padding-bottom: 10px;}
-            table { width: 100%; border-collapse: collapse; margin-top: 10px; page-break-inside: auto; }
-            th, td { border: 1px solid #e3e4e5; padding: 12px; text-align: center; font-size: 14px; }
-            th { background: #f4f5f7; font-weight: 600; }
-            td.item-name { text-align: left; display: flex; align-items: center; gap: 15px; border-bottom: none; border-top: none;}
-            tr { border-bottom: 1px solid #e3e4e5; page-break-inside: avoid; }
-            img { width: 40px; height: 40px; object-fit: contain; border-radius: 4px; background: #fff; }
-            .check { color: #0071ce; font-weight: bold; font-size: 1.5em; }
-            .freq-subtext { font-size: 12px; color: #777; display: block; margin-top: 2px; font-weight: normal; }
-            @media print {
-                body { padding: 0; }
-                @page { margin: 0.5in; size: landscape; }
-            }
-        </style>
+      <title>Walmart Subscription Calendar</title>
+      <style>
+        body { font-family: 'Bogle', 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 20px; color: #2e2f32; max-width: 1000px; margin: 0 auto; }
+        h1 { color: #0071ce; margin-bottom: 15px; font-size: 24px; border-bottom: 2px solid #0071ce; padding-bottom: 8px;}
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
+        th, td { border: 1px solid #e3e4e5; padding: 4px 6px; text-align: center; font-size: 13px; overflow: hidden; }
+        th { background: #f4f5f7; font-weight: 600; padding: 6px; }
+        td.item-name { text-align: left; display: flex; align-items: center; gap: 10px; border-bottom: none; border-top: none; }
+        tr { border-bottom: 1px solid #e3e4e5; page-break-inside: avoid; }
+        img { width: 36px; height: 36px; object-fit: contain; border-radius: 4px; background: #fff; flex-shrink: 0; }
+        .item-name-text {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.2;
+        }
+        .check { color: #0071ce; font-weight: bold; font-size: 1.3em; line-height: 1; }
+        .freq-subtext { font-size: 11px; color: #777; display: block; margin-top: 2px; }
+        @media print {
+            body { padding: 0; max-width: 100%; }
+            @page { margin: 0.4in; size: portrait; }
+        }
+      </style>
     </head>
     <body>
-        <h1>Subscription Calendar</h1>
-        <table>
-            <thead>
-                <tr>
-                    <th style="text-align: left; width: 40%;">Item</th>`;
+      <h1>Subscription Calendar</h1>
+      <table>
+        <thead>
+          <tr>
+            <th style="text-align: left; width: 50%;">Item</th>`;
 
-    colDates.forEach(d => html += `<th>${d}</th>`);
-    html += `       <th>Later Dates</th>
-                </tr>
-            </thead>
-            <tbody>`;
+    colDates.forEach(d => html += `<th style="width: 8%;">${d}</th>`);
+
+    html += `       <th style="width: 10%;">Later Dates</th>
+          </tr>
+        </thead>
+        <tbody>`;
 
     items.forEach(item => {
-        html += `<tr><td class="item-name">`;
-        if(item.imgSrc) html += `<img loading="lazy" src="${item.imgSrc}">`;
+      html += `<tr><td class="item-name">`;
+      if(item.imgSrc) html += `<img loading="lazy" src="${item.imgSrc}">`;
+      let freqDisplay = item.freq ? `<span class="freq-subtext">${item.freq}</span>` : '';
+      html += `<div><span class="item-name-text">${item.name}</span>${freqDisplay}</div></td>`;
 
-        let freqDisplay = item.freq ? `<span class="freq-subtext">${item.freq}</span>` : '';
-        html += `<div><span>${item.name}</span>${freqDisplay}</div></td>`;
-
-        colDates.forEach(d => {
-            if(item.allDates.includes(d)) {
-                html += `<td><span class="check">✓</span></td>`;
-            } else {
-                html += `<td></td>`;
-            }
-        });
-
-        if(item.nextAfterMax) {
-            html += `<td style="color: #555; font-weight: 500;">${item.nextAfterMax}</td>`;
+      colDates.forEach(d => {
+        if(item.allDates.includes(d)) {
+          html += `<td><span class="check">✓</span></td>`;
         } else {
-            html += `<td></td>`;
+          html += `<td></td>`;
         }
-        html += `</tr>`;
+      });
+
+      if(item.nextAfterMax) {
+        html += `<td style="color: #555; font-weight: 500;">${item.nextAfterMax}</td>`;
+      } else {
+        html += `<td></td>`;
+      }
+      html += `</tr>`;
     });
 
-    // We wait for the window (and our new tiny images) to load before triggering print
     html += `
-            </tbody>
-        </table>
-        <script>
-            window.onload = function() {
-                setTimeout(() => window.print(), 500);
-            };
-        </script>
+        </tbody>
+      </table>
+      <script>
+        window.onload = function() { setTimeout(() => window.print(), 500); };
+      </script>
     </body>
     </html>`;
 
