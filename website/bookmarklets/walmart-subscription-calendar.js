@@ -64,7 +64,11 @@
 
     // Pre-calculate all dates for each item (backwards and forwards) BEFORE sorting
     items.forEach(item => {
+        console.groupCollapsed('Trace: ' + item.name);
+        console.log("Raw Freq:", item.freq);
+
         item.dateObj = new Date(`${item.date} ${currentYear}`);
+        console.log("Base DateObj:", item.dateObj.toString());
         item.allDates = [];
 
         let match = item.freq.match(/every\s+(\d+)?\s*(week|month)s?/i);
@@ -73,16 +77,19 @@
         if (match) {
             let amount = parseInt(match[1]) || 1;
             let unit = match[2].toLowerCase();
+            console.log("Parsed Amount:", amount, "Unit:", unit);
             item.freqDays = (unit === 'week') ? amount * 7 : amount * 30;
 
             // Backwards extrapolation
             let backDate = new Date(item.dateObj.getTime());
             for(let i = 0; i < 20; i++) {
+                console.log("  [Backwards Iteration " + i + "] Before Math:", backDate.toString(), " | Subtracting:", (amount * 7), "days");
                 if (unit === 'week') {
                     backDate.setDate(backDate.getDate() - (amount * 7));
                 } else if (unit === 'month') {
                     backDate.setMonth(backDate.getMonth() - amount);
                 }
+                console.log("  [Backwards Iteration " + i + "] After Math:", backDate.toString());
 
                 if (backDate >= today) {
                     let m = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][backDate.getMonth()];
@@ -106,17 +113,22 @@
             let fwdDate = new Date(item.dateObj.getTime());
 
             for(let i = 0; i < 10; i++) {
+                console.log("  [Forwards Iteration " + i + "] Before Math:", fwdDate.toString(), " | Adding:", (amount * 7), "days");
                 if (unit === 'week') {
                     fwdDate.setDate(fwdDate.getDate() + (amount * 7));
                 } else if (unit === 'month') {
                     fwdDate.setMonth(fwdDate.getMonth() + amount);
                 }
+                console.log("  [Forwards Iteration " + i + "] After Math:", fwdDate.toString());
 
                 let m = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][fwdDate.getMonth()];
                 let d = fwdDate.getDate().toString().padStart(2, '0');
                 item.allDates.push(`${m} ${d}`);
             }
         }
+
+        console.log("Final allDates Array:", item.allDates);
+        console.groupEnd();
     });
 
     // Sort items (Soonest Date -> Smallest Frequency -> Alphabetical)
