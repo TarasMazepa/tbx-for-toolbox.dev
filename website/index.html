@@ -162,7 +162,7 @@
         </div>
 
         <script>
-            async function loadBookmarklets() {
+            function loadBookmarklets() {
                 const bms = [
                     { id: 'bm-walmart-calendar', file: 'bookmarklets/walmart-subscription-calendar.js' },
                     { id: 'bm-walmart-checklist', file: 'bookmarklets/walmart-delivery-checklist.js' },
@@ -170,15 +170,9 @@
                 ];
 
                 for (const bm of bms) {
-                    try {
-                        const res = await fetch(bm.file);
-                        const text = await res.text();
-                        const el = document.getElementById(bm.id);
-                        if (el) {
-                            el.href = 'javascript:' + encodeURIComponent(text.trim());
-                        }
-                    } catch (e) {
-                        console.error('Failed to load ' + bm.file, e);
+                    const el = document.getElementById(bm.id);
+                    if (el) {
+                        el.href = "javascript:(function(){let s=document.createElement('script');s.src='https://raw.githubusercontent.com/TarasMazepa/tbx-for-toolbox.dev/main/website/" + bm.file + "?v=' + Date.now();document.head.appendChild(s);})();";
                     }
                 }
             }
