@@ -160,7 +160,7 @@
         let orderDateStr = '';
         let h2s = document.querySelectorAll('h2');
         for (let h2 of h2s) {
-            if (h2.innerText.includes('Delivered') || h2.innerText.includes('Arriving') || h2.innerText.includes('Delivery')) {
+            if (h2.innerText.includes('Delivered') || h2.innerText.includes('Arriving') || h2.innerText.includes('Arrives') || h2.innerText.includes('Delivery')) {
                 deliveryStatus = h2.innerText.trim();
                 let match = deliveryStatus.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}/i);
                 if (match) orderDateStr = match[0];
