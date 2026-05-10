@@ -64,8 +64,8 @@
 
     // Pre-calculate all dates for each item (backwards and forwards) BEFORE sorting
     items.forEach(item => {
-        console.groupCollapsed('Trace: ' + item.name);
-        console.log("Raw Freq:", item.freq);
+        console.groupCollapsed('T:'+item.name);
+        console.log("F:", item.freq);
 
         item.dateObj = new Date(`${item.date} ${currentYear}`);
         console.log("Base DateObj:", item.dateObj.toString());
@@ -77,19 +77,19 @@
         if (match) {
             let amount = parseInt(match[1]) || 1;
             let unit = match[2].toLowerCase();
-            console.log("Parsed Amount:", amount, "Unit:", unit);
+            console.log("A:", amount, "U:", unit);
             item.freqDays = (unit === 'week') ? amount * 7 : amount * 30;
 
             // Backwards extrapolation
             let backDate = new Date(item.dateObj.getTime());
             for(let i = 0; i < 20; i++) {
-                console.log("  [Backwards Iteration " + i + "] Before Math:", backDate.toString(), " | Subtracting:", (amount * 7), "days");
+                console.log(`[B${i}]`, backDate);
                 if (unit === 'week') {
                     backDate.setDate(backDate.getDate() - (amount * 7));
                 } else if (unit === 'month') {
                     backDate.setMonth(backDate.getMonth() - amount);
                 }
-                console.log("  [Backwards Iteration " + i + "] After Math:", backDate.toString());
+
 
                 if (backDate >= today) {
                     let m = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][backDate.getMonth()];
@@ -115,13 +115,13 @@
             let fwdDate = new Date(item.dateObj.getTime());
 
             for(let i = 0; i < 10; i++) {
-                console.log("  [Forwards Iteration " + i + "] Before Math:", fwdDate.toString(), " | Adding:", (amount * 7), "days");
+                console.log(`[F${i}]`, fwdDate);
                 if (unit === 'week') {
                     fwdDate.setDate(fwdDate.getDate() + (amount * 7));
                 } else if (unit === 'month') {
                     fwdDate.setMonth(fwdDate.getMonth() + amount);
                 }
-                console.log("  [Forwards Iteration " + i + "] After Math:", fwdDate.toString());
+
 
                 let m = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][fwdDate.getMonth()];
                 let d = fwdDate.getDate().toString().padStart(2, '0');
@@ -178,48 +178,11 @@
     });
 
     // Build the grid
-    let html = `
-    <html>
-    <head>
-      <title>Walmart Subscription Calendar</title>
-      <style>
-        body { font-family: 'Bogle', 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 20px; color: #2e2f32; max-width: 1000px; margin: 0 auto; }
-        h1 { color: #0071ce; margin-bottom: 15px; font-size: 24px; border-bottom: 2px solid #0071ce; padding-bottom: 8px;}
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
-        th, td { border: 1px solid #e3e4e5; padding: 4px 6px; text-align: center; font-size: 13px; overflow: hidden; }
-        th { background: #f4f5f7; font-weight: 600; padding: 6px; }
-        td.item-name { text-align: left; display: flex; align-items: center; gap: 10px; border-bottom: none; border-top: none; }
-        tr { border-bottom: 1px solid #e3e4e5; page-break-inside: avoid; }
-        img { width: 36px; height: 36px; object-fit: contain; border-radius: 4px; background: #fff; flex-shrink: 0; }
-        .item-name-text {
-            display: -webkit-box;
-            -webkit-line-clamp: 3;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            line-height: 1.2;
-        }
-        .check { color: #0071ce; font-weight: bold; font-size: 1.3em; line-height: 1; }
-        .freq-subtext { font-size: 11px; color: #777; display: block; margin-top: 2px; }
-        @media print {
-            body { padding: 0; max-width: 100%; }
-            @page { margin: 0.4in; size: portrait; }
-        }
-      </style>
-    </head>
-    <body>
-      <h1>Subscription Calendar</h1>
-      <table>
-        <thead>
-          <tr>
-            <th style="text-align: left; width: 50%;">Item</th>`;
+    let html = `<html><head><title>Walmart Subscription Calendar</title><style>body{font-family:'Bogle','Helvetica Neue',Helvetica,Arial,sans-serif;padding:20px;color:#2e2f32;max-width:1000px;margin:0 auto}h1{color:#0071ce;margin-bottom:15px;font-size:24px;border-bottom:2px solid #0071ce;padding-bottom:8px}table{width:100%;border-collapse:collapse;margin-top:10px;table-layout:fixed}th,td{border:1px solid #e3e4e5;padding:4px 6px;text-align:center;font-size:13px;overflow:hidden}th{background:#f4f5f7;font-weight:600;padding:6px}td.item-name{text-align:left;display:flex;align-items:center;gap:10px;border-bottom:none;border-top:none}tr{border-bottom:1px solid #e3e4e5;page-break-inside:avoid}img{width:36px;height:36px;object-fit:contain;border-radius:4px;background:#fff;flex-shrink:0}.item-name-text{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis;line-height:1.2}.check{color:#0071ce;font-weight:bold;font-size:1.3em;line-height:1}.freq-subtext{font-size:11px;color:#777;display:block;margin-top:2px}@media print{body{padding:0;max-width:100%}@page{margin:.4in;size:portrait}}</style></head><body><h1>Subscription Calendar</h1><table><thead><tr><th style="text-align:left;width:50%">Item</th>`;
 
     colDates.forEach(d => { let displayDate = d.split(' ').slice(0, 2).join(' '); html += `<th style="width: 8%;">${displayDate}</th>`; });
 
-    html += `       <th style="width: 10%;">Later Dates</th>
-          </tr>
-        </thead>
-        <tbody>`;
+    html += `<th style="width:10%">Later Dates</th></tr></thead><tbody>`;
 
     items.forEach(item => {
       html += `<tr><td class="item-name">`;
@@ -243,14 +206,7 @@
       html += `</tr>`;
     });
 
-    html += `
-        </tbody>
-      </table>
-      <script>
-        window.onload = function() { setTimeout(() => window.print(), 500); };
-      </script>
-    </body>
-    </html>`;
+    html += `</tbody></table><script>window.onload=function(){setTimeout(()=>window.print(),500)};</script></body></html>`;
 
     let win = window.open('', '_blank');
     if(win) {
