@@ -134,9 +134,22 @@
         console.groupEnd();
     });
 
+    // Calculate earliest actual upcoming date for sorting
+    items.forEach(item => {
+        let validFutureDates = item.allDates
+            .map(d => new Date(d).getTime())
+            .filter(t => t >= today.getTime());
+
+        if (validFutureDates.length > 0) {
+            item.earliestFutureTime = Math.min(...validFutureDates);
+        } else {
+            item.earliestFutureTime = item.dateObj.getTime();
+        }
+    });
+
     // Sort items (Soonest Date -> Smallest Frequency -> Alphabetical)
     items.sort((a, b) => {
-        if (a.dateObj.getTime() !== b.dateObj.getTime()) return a.dateObj - b.dateObj;
+        if (a.earliestFutureTime !== b.earliestFutureTime) return a.earliestFutureTime - b.earliestFutureTime;
         if (a.freqDays !== b.freqDays) return a.freqDays - b.freqDays;
         return a.name.localeCompare(b.name);
     });
