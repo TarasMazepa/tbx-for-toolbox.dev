@@ -183,7 +183,7 @@
                         el.style.opacity = '0.7';
 
                         try {
-                            const response = await fetch(bm.file);
+                            const response = await fetch(bm.file + '?t=' + Date.now(), { cache: 'no-store' });
                             const rawCode = await response.text();
 
                             const minifiedCode = await Terser.minify(rawCode, {
