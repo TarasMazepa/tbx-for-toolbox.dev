@@ -1,13 +1,13 @@
 (function() {
     // 1. Enforce starting location
     if (!window.location.href.match(/walmart\.com\/subscriptions\/manage/)) {
-        alert("⚠️ Please run this from your Walmart Subscriptions Management page.");
+        alert("⚠️ Run from Walmart Subscriptions Manage page.");
         return;
     }
 
     let toast = document.createElement('div');
-    toast.innerHTML = '🔄 Scanning Subscriptions & Processing Orders...<br><small style="font-weight:normal;">Please wait...</small>';
-    toast.style.cssText = 'position:fixed; bottom:20px; right:20px; background:#0071ce; color:#fff; padding:15px 25px; border-radius:8px; z-index:999999; font-family:sans-serif; font-size:16px; font-weight:bold; box-shadow:0 4px 12px rgba(0,0,0,0.2);';
+    toast.innerHTML = '🔄 Scanning...<br><small>Please wait...</small>';
+    toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#0071ce;color:#fff;padding:15px 25px;border-radius:8px;z-index:999999;font-family:sans-serif;font-size:16px;font-weight:bold;box-shadow:0 4px 12px rgba(0,0,0,0.2)';
     document.body.appendChild(toast);
 
     const currentYear = new Date().getFullYear();
@@ -23,7 +23,7 @@
 
     if (cards.length === 0) {
         toast.remove();
-        return alert("⚠️ No subscriptions found on this page. Make sure they have loaded.");
+        return alert("⚠️ No subscriptions found.");
     }
 
     cards.forEach(card => {
@@ -80,7 +80,7 @@
     let ordersWin = window.open('/orders', '_blank');
     if(!ordersWin) {
         toast.remove();
-        return alert("⚠️ Browser blocked the pop-up. Please allow pop-ups for Walmart.com to scan processing orders.");
+        return alert("⚠️ Pop-up blocked.");
     }
 
     let maxAttempts = 60;
@@ -134,7 +134,7 @@
                 clearInterval(checkInterval);
                 ordersWin.close();
                 toast.remove();
-                console.warn("Timeout waiting for Orders to load.");
+                console.warn("Timeout");
                 buildCalendar(items);
             }
         } catch (e) {
@@ -198,33 +198,33 @@
             }
         });
 
-        let html = `<html><head><title>Walmart Subscription Calendar v2</title><style>body{font-family:'Bogle','Helvetica Neue',Helvetica,Arial,sans-serif;padding:20px;color:#2e2f32;max-width:1000px;margin:0 auto}h1{color:#0071ce;margin-bottom:15px;font-size:24px;border-bottom:2px solid #0071ce;padding-bottom:8px}table{width:100%;border-collapse:collapse;margin-top:10px;table-layout:fixed}th,td{border:1px solid #e3e4e5;padding:4px 6px;text-align:center;font-size:13px;overflow:hidden}th{background:#f4f5f7;font-weight:600;padding:6px}td.item-name{text-align:left;display:flex;align-items:center;gap:10px;border-bottom:none;border-top:none}tr{border-bottom:1px solid #e3e4e5;page-break-inside:avoid}img{width:36px;height:36px;object-fit:contain;border-radius:4px;background:#fff;flex-shrink:0}.item-name-text{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis;line-height:1.2}.check{color:#0071ce;font-weight:bold;font-size:1.3em;line-height:1}.freq-subtext{font-size:11px;color:#777;display:block;margin-top:2px}@media print{body{padding:0;max-width:100%}@page{margin:.4in;size:portrait}}</style></head><body><h1>Subscription Calendar</h1><table><thead><tr><th style="text-align:left;width:50%">Item</th>`;
+        let html = `<html><head><title>Walmart Subscription Calendar v2</title><style>body{font-family:'Bogle','Helvetica Neue',Helvetica,Arial,sans-serif;padding:20px;color:#2e2f32;max-width:1000px;margin:0 auto}h1{color:#0071ce;margin-bottom:15px;font-size:24px;border-bottom:2px solid #0071ce;padding-bottom:8px}table{width:100%;border-collapse:collapse;margin-top:10px;table-layout:fixed}th,td{border:1px solid #e3e4e5;padding:4px 6px;text-align:center;font-size:13px;overflow:hidden}th{background:#f4f5f7;font-weight:600;padding:6px}td.n{text-align:left;display:flex;align-items:center;gap:10px;border-bottom:none;border-top:none}tr{border-bottom:1px solid #e3e4e5;page-break-inside:avoid}img{width:36px;height:36px;object-fit:contain;border-radius:4px;background:#fff;flex-shrink:0}.t{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis;line-height:1.2}.c{color:#0071ce;font-weight:bold;font-size:1.3em;line-height:1}.f{font-size:11px;color:#777;display:block;margin-top:2px}@media print{body{padding:0;max-width:100%}@page{margin:.4in;size:portrait}}</style></head><body><h1>Subscription Calendar</h1><table><thead><tr><th style="text-align:left;width:50%">Item</th>`;
 
         colDates.forEach(d => {
             let displayDate = d.split(' ').slice(0, 2).join(' ');
-            html += `<th style="width: 8%;">${displayDate}</th>`;
+            html += `<th style="width:8%">${displayDate}</th>`;
         });
 
         html += `<th style="width:10%">Later Dates</th></tr></thead><tbody>`;
 
         items.forEach(item => {
-            html += `<tr><td class="item-name">`;
+            html += `<tr><td class="n">`;
             if(item.imgSrc) html += `<img loading="lazy" src="${item.imgSrc}">`;
-            let freqDisplay = item.freq ? `<span class="freq-subtext">${item.freq}</span>` : '';
-            html += `<div><span class="item-name-text">${item.name}</span>${freqDisplay}</div></td>`;
+            let freqDisplay = item.freq ? `<span class="f">${item.freq}</span>` : '';
+            html += `<div><span class="t">${item.name}</span>${freqDisplay}</div></td>`;
 
             colDates.forEach(d => {
-                if(item.allDates.includes(d)) html += `<td><span class="check">✓</span></td>`;
+                if(item.allDates.includes(d)) html += `<td><span class="c">✓</span></td>`;
                 else html += `<td></td>`;
             });
 
-            if(item.nextAfterMax) html += `<td style="color: #555; font-weight: 500;">${item.nextAfterMax.split(' ').slice(0, 2).join(' ')}</td>`;
+            if(item.nextAfterMax) html += `<td style="color:#555;font-weight:500">${item.nextAfterMax.split(' ').slice(0, 2).join(' ')}</td>`;
             else html += `<td></td>`;
 
             html += `</tr>`;
         });
 
-        html += `</tbody></table><script>setTimeout(()=>window.print(), 500);</script></body></html>`;
+        html += `</tbody></table><script>setTimeout(()=>window.print(),500);</script></body></html>`;
 
         let outWin = window.open('', '_blank');
         if(outWin) {
