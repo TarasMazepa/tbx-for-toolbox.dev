@@ -1,235 +1,291 @@
-(function() {
-    // 1. Enforce starting location
-    if (!window.location.href.match(/walmart\.com\/subscriptions\/manage/)) {
-        alert("⚠️ Run from Walmart Subscriptions Manage page.");
-        return;
-    }
+(function(){var D=document; var D = document;
+// 1. Enforce starting location
+if (!window.location.href.match(/walmart\.com\/subscriptions\/manage/)) {
+alert("⚠️ Run from Walmart Subscriptions Manage page.");
+return;
+}
 
-    let toast = document.createElement('div');
-    toast.innerHTML = '🔄 Scanning...<br><small>Please wait...</small>';
-    toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#0071ce;color:#fff;padding:15px 25px;border-radius:8px;z-index:999999;font-family:sans-serif;font-size:16px;font-weight:bold;box-shadow:0 4px 12px rgba(0,0,0,0.2)';
-    document.body.appendChild(toast);
+// 2. Open loading tab synchronously to bypass pop-up blockers
+var win = window.open('', '_blank');
+if (!win) {
+alert("⚠️ Pop-up blocked.");
+return;
+}
 
-    const currentYear = new Date().getFullYear();
-    let today = new Date();
-    today.setHours(0,0,0,0);
+win.document.write(`<html><body style="font-family:sans-serif;padding:40px;color:#2e2f32"><h2 style="color:#0071ce">🔄 Scanning Subscriptions & Orders...</h2><p>Please wait while we check for processing shipments...</p></body></html>`);
 
-    // 2. Extract baseline subscription data
-    let items = [];
+var currentYear = new Date().getFullYear();
+var today = new Date();
+today.setHours(0, 0, 0, 0);
 
-    // Scope to the specific subscriptions container provided in the HTML
-    let container = document.querySelector('[data-testid="subscription-items-container"]') || document;
-    let cards = container.querySelectorAll('.pv4');
+// 3. Extract baseline subscription data
+var items = [];
+var container = D.querySelector('[data-testid="subscription-items-container"]') || document;
+var cards = container.querySelectorAll('.pv4');
 
-    if (cards.length === 0) {
-        toast.remove();
-        return alert("⚠️ No subscriptions found.");
-    }
+if (cards.length === 0) {
+win.close();
+return alert("⚠️ No subscriptions found.");
+}
 
-    cards.forEach(card => {
-        // 1st Priority: The span class. 2nd Priority: The aria-label on the link (highly robust). 3rd: Image Alt.
-        let name = '';
-        let nameEl = card.querySelector('.ld_AY');
-        if (nameEl) name = nameEl.innerText.trim();
+cards.forEach(card => {
+var name = '';
+var nameEl = card.querySelector('.ld_AY');
+if (nameEl) name = nameEl.innerText.trim();
 
-        if (!name) {
-            let aEl = card.querySelector('a[aria-label]');
-            if (aEl) name = aEl.getAttribute('aria-label');
-        }
+if (!name) {
+var aEl = card.querySelector('a[aria-label]');
+if (aEl) name = aEl.getAttribute('aria-label');
+}
 
-        if (!name) {
-            let imgAlt = card.querySelector('img');
-            if (imgAlt) name = imgAlt.alt;
-        }
+if (!name) {
+var imgAlt = card.querySelector('img');
+if (imgAlt) name = imgAlt.alt;
+}
 
-        if(!name) return;
+if (!name) return;
 
-        let imgEl = card.querySelector('img');
-        let imgSrc = imgEl ? imgEl.src : '';
-        if (imgSrc) imgSrc = imgSrc.split('?')[0] + "?odnHeight=80&odnWidth=80&odnBg=FFFFFF";
+var imgEl = card.querySelector('img');
+var imgSrc = imgEl ? imgEl.src : '';
+if (imgSrc) imgSrc = imgSrc.split('?')[0] + "?odnHeight=80&odnWidth=80&odnBg=FFFFFF";
 
-        let dateStr = '';
-        let bEls = card.querySelectorAll('b');
-        bEls.forEach(b => {
-            if(b.parentNode && b.parentNode.innerText.includes('next delivery')) dateStr = b.innerText.trim();
-        });
-        if(!dateStr) {
-            let spans = card.querySelectorAll('span');
-            for(let span of spans) {
-                if(span.innerText.includes('next delivery on')) {
-                    dateStr = span.innerText.replace('next delivery on', '').trim();
-                    break;
-                }
-            }
-        }
+var dateStr = '';
+var bEls = card.querySelectorAll('b');
+bEls.forEach(b => {
+if (b.parentNode && b.parentNode.innerText.includes('next delivery')) {
+dateStr = b.innerText.trim();
+}
+});
 
-        let freqStr = '';
-        let spansFreq = card.querySelectorAll('span');
-        for(let span of spansFreq) {
-            let text = span.innerText.toLowerCase();
-            if(text.includes('every ') && !text.includes('delivery')) {
-                freqStr = text;
-                break;
-            }
-        }
+if (!dateStr) {
+var spans = card.querySelectorAll('span');
+for (var span of spans) {
+if (span.innerText.includes('next delivery on')) {
+dateStr = span.innerText.replace('next delivery on', '').trim();
+break;
+}
+}
+}
 
-        if(name && dateStr) items.push({name, imgSrc, date: dateStr, freq: freqStr, allDates: []});
-    });
+var freqStr = '';
+var spansFreq = card.querySelectorAll('span');
+for (var span of spansFreq) {
+var text = span.innerText.toLowerCase();
+if (text.includes('every ') && !text.includes('delivery')) {
+freqStr = text;
+break;
+}
+}
 
-    // 3. Check Orders page for "Processing" subscription shipments
-    let ordersWin = window.open('/orders', '_blank');
-    if(!ordersWin) {
-        toast.remove();
-        return alert("⚠️ Pop-up blocked.");
-    }
+if (name && dateStr) {
+items.push({ name, imgSrc, date: dateStr, freq: freqStr, allDates: [] });
+}
+});
 
-    let maxAttempts = 60;
-    let attempts = 0;
+// 4. Two-Stage Background Polling for Processing Orders
+var iframe = D.createElement('iframe');
+iframe.style.display = 'none';
+iframe.src = '/orders';
+D.body.appendChild(iframe);
 
-    let checkInterval = setInterval(() => {
-        attempts++;
-        try {
-            let doc = ordersWin.document;
-            let h2s = doc.querySelectorAll('h2');
-            let isLoaded = doc.body && doc.body.innerText.includes('Purchase history');
+var attempts = 0;
+var mode = 'list'; // 'list' (find order ID) -> 'detail' (scrape items)
+var processingDateStr = '';
 
-            if (isLoaded && h2s.length > 0) {
-                clearInterval(checkInterval);
+var checkInterval = setInterval(() => {
+attempts++;
+try {
+var doc = iframe.contentWindow.document;
 
-                let processingDatesAndItems = [];
-                h2s.forEach(h2 => {
-                    let headerText = h2.innerText.trim();
-                    if (headerText.includes('Arrives') || headerText.includes('Arriving')) {
-                        let nextElement = h2.nextElementSibling;
-                        let isSub = nextElement && nextElement.innerText.includes('Subscription shipment');
+// STAGE 1: Scan Purchase History for an active Subscription Shipment
+if (mode === 'list') {
+var h2s = doc.querySelectorAll('h2');
+var isLoaded = doc.body && doc.body.innerText.includes('Purchase history');
 
-                        if (isSub) {
-                            let match = headerText.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}/i);
-                            if (match) {
-                                let orderDate = match[0];
-                                let orderImages = h2.parentElement.querySelectorAll('img');
-                                orderImages.forEach(img => {
-                                    if(img.alt) processingDatesAndItems.push({ date: orderDate, itemName: img.alt });
-                                });
-                            }
-                        }
-                    }
-                });
+if (isLoaded && h2s.length > 0) {
+var foundOrderId = null;
 
-                items.forEach(item => {
-                    let cleanSubName = item.name.toLowerCase().substring(0, 15);
-                    let foundInOrder = processingDatesAndItems.find(orderItem =>
-                        orderItem.itemName.toLowerCase().includes(cleanSubName) ||
-                        cleanSubName.includes(orderItem.itemName.toLowerCase().substring(0, 15))
-                    );
+for (var h2 of h2s) {
+var headerText = h2.innerText.trim();
+if (headerText.includes('Arrives') || headerText.includes('Arriving') || headerText.includes('Delivered')) {
+var nextElement = h2.nextElementSibling;
+var isSub = nextElement && nextElement.innerText.includes('Subscription shipment');
 
-                    if (foundInOrder) item.processingDate = foundInOrder.date;
-                });
+if (isSub) {
+var match = headerText.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}/i);
+if (match) {
+// Navigate up the DOM tree to find the order ID link
+var orderContainer = h2.closest('[data-testid^="order-"]') || h2.closest('.ld_AJ.mv4') || h2.parentElement.parentElement;
+if (orderContainer) {
+var detailBtn = orderContainer.querySelector('button[data-automation-id^="view-order-details-link-"], a[href^="/orders/"]');
+if (detailBtn) {
+var dataId = detailBtn.getAttribute('data-automation-id') || '';
+var href = detailBtn.getAttribute('href') || '';
+var idMatch = dataId.match(/link-(\d+)/) || href.match(/\/orders\/(\d+)/);
 
-                ordersWin.close();
-                toast.remove();
-                buildCalendar(items);
+if (idMatch) {
+processingDateStr = match[0];
+foundOrderId = idMatch[1];
+break;
+}
+}
+}
+}
+}
+}
+}
 
-            } else if (attempts >= maxAttempts) {
-                clearInterval(checkInterval);
-                ordersWin.close();
-                toast.remove();
-                console.warn("Timeout");
-                buildCalendar(items);
-            }
-        } catch (e) {
-            // Ignore cross-origin errors during initial load
-        }
-    }, 500);
+if (foundOrderId) {
+mode = 'detail';
+attempts = 0; // Reset timeout for next page load
+iframe.src = '/orders/' + foundOrderId;
+}else{
+// No processing subs found, move on
+clearInterval(checkInterval);
+iframe.remove();
+buildCalendar(items);
+}
+}
+}
+// STAGE 2: Scrape the specific details of that order
+else if (mode === 'detail') {
+var itemCards = doc.querySelectorAll('div[data-testid="itemtile-stack"]');
+if (itemCards.length > 0) {
+clearInterval(checkInterval);
 
-    // 4. Build the calendar
-    function buildCalendar(items) {
-        items.forEach(item => {
-            let startingDateStr = item.processingDate ? item.processingDate : item.date;
-            item.dateObj = new Date(`${startingDateStr} ${currentYear}`);
+var processingItems = [];
+itemCards.forEach(card => {
+var nameEl = card.querySelector('[data-testid="productName"]');
+if (nameEl) {
+processingItems.push({ date: processingDateStr, itemName: nameEl.innerText.trim() });
+}
+});
 
-            let mBase = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][item.dateObj.getMonth()];
-            let dBase = item.dateObj.getDate().toString().padStart(2, '0');
-            item.allDates.push(`${mBase} ${dBase} ${currentYear}`);
+// Merge processing dates with baseline items
+items.forEach(item => {
+var cleanSubName = item.name.toLowerCase().trim();
 
-            let match = item.freq.match(/every\s+(\d+)?\s*(week|month)s?/i);
-            item.freqDays = 9999;
+var foundInOrder = processingItems.find(orderItem => {
+// Strip multipack text from order items for cleaner matching
+var orderName = orderItem.itemName.toLowerCase().trim().replace(/multipack quantity:\s*\d+/g, '').trim();
+return orderName === cleanSubName || orderName.includes(cleanSubName) || cleanSubName.includes(orderName);
+});
 
-            if (match) {
-                let amount = parseInt(match[1]) || 1;
-                let unit = match[2].toLowerCase();
-                item.freqDays = (unit === 'week') ? amount * 7 : amount * 30;
+if (foundInOrder) {
+item.processingDate = foundInOrder.date;
+}
+});
 
-                let fwdDate = new Date(item.dateObj.getTime());
-                for(let i = 0; i < 15; i++) {
-                    if (unit === 'week') fwdDate.setDate(fwdDate.getDate() + (amount * 7));
-                    else if (unit === 'month') fwdDate.setMonth(fwdDate.getMonth() + amount);
+iframe.remove();
+buildCalendar(items);
+}
+}
+} catch (e) {
+// Ignore cross-origin errors during iframe loads
+}
 
-                    let m = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][fwdDate.getMonth()];
-                    let d = fwdDate.getDate().toString().padStart(2, '0');
-                    item.allDates.push(`${m} ${d} ${fwdDate.getFullYear()}`);
-                }
-            }
-            item.earliestFutureTime = item.dateObj.getTime();
-        });
+// Timeout fallback
+if (attempts >= 40) {
+clearInterval(checkInterval);
+iframe.remove();
+console.warn("Timeout");
+buildCalendar(items);
+}
+}, 500);
 
-        items.sort((a, b) => {
-            if (a.earliestFutureTime !== b.earliestFutureTime) return a.earliestFutureTime - b.earliestFutureTime;
-            if (a.freqDays !== b.freqDays) return a.freqDays - b.freqDays;
-            return a.name.localeCompare(b.name);
-        });
+// 5. Build and render the calendar
+function buildCalendar(items) {
+items.forEach(item => {
+var startingDateStr = item.processingDate ? item.processingDate : item.date;
+item.dateObj = new Date(`${startingDateStr} ${currentYear}`);
 
-        let allExtrapolatedDates = items.flatMap(i => i.allDates);
-        let uniqueDates = [...new Set(allExtrapolatedDates)];
-        uniqueDates.sort((a, b) => new Date(a) - new Date(b));
-        uniqueDates = uniqueDates.filter(d => new Date(d) >= today);
+var mBase = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][item.dateObj.getMonth()];
+var dBase = item.dateObj.getDate().toString().padStart(2, '0');
+item.allDates.push(`${mBase} ${dBase} ${currentYear}`);
 
-        let maxCols = 5;
-        let colDates = uniqueDates.slice(0, maxCols);
-        let maxDateObj = new Date(colDates[colDates.length - 1]);
+var match = item.freq.match(/every\s+(\d+)?\s*(week|month)s?/i);
+item.freqDays = 9999;
 
-        items.forEach(item => {
-            item.nextAfterMax = '';
-            for (let d of item.allDates) {
-                if (new Date(d) > maxDateObj) {
-                    item.nextAfterMax = d;
-                    break;
-                }
-            }
-        });
+if (match) {
+var amount = parseInt(match[1]) || 1;
+var unit = match[2].toLowerCase();
+item.freqDays = (unit === 'week') ? amount * 7 : amount * 30;
 
-        let html = `<html><head><title>Walmart Subscription Calendar v2</title><style>body{font-family:'Bogle','Helvetica Neue',Helvetica,Arial,sans-serif;padding:20px;color:#2e2f32;max-width:1000px;margin:0 auto}h1{color:#0071ce;margin-bottom:15px;font-size:24px;border-bottom:2px solid #0071ce;padding-bottom:8px}table{width:100%;border-collapse:collapse;margin-top:10px;table-layout:fixed}th,td{border:1px solid #e3e4e5;padding:4px 6px;text-align:center;font-size:13px;overflow:hidden}th{background:#f4f5f7;font-weight:600;padding:6px}td.n{text-align:left;display:flex;align-items:center;gap:10px;border-bottom:none;border-top:none}tr{border-bottom:1px solid #e3e4e5;page-break-inside:avoid}img{width:36px;height:36px;object-fit:contain;border-radius:4px;background:#fff;flex-shrink:0}.t{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis;line-height:1.2}.c{color:#0071ce;font-weight:bold;font-size:1.3em;line-height:1}.f{font-size:11px;color:#777;display:block;margin-top:2px}@media print{body{padding:0;max-width:100%}@page{margin:.4in;size:portrait}}</style></head><body><h1>Subscription Calendar</h1><table><thead><tr><th style="text-align:left;width:50%">Item</th>`;
+var fwdDate=new Date(item.dateObj.getTime());
+for(var i = 0; i < 15; i++) {
+if (unit === 'week') fwdDate.setDate(fwdDate.getDate() + (amount * 7));
+else if (unit === 'month') fwdDate.setMonth(fwdDate.getMonth() + amount);
 
-        colDates.forEach(d => {
-            let displayDate = d.split(' ').slice(0, 2).join(' ');
-            html += `<th style="width:8%">${displayDate}</th>`;
-        });
+var m=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][fwdDate.getMonth()];
+var d=fwdDate.getDate().toString().padStart(2,'0');
+item.allDates.push(`${m} ${d} ${fwdDate.getFullYear()}`);
+}
+}
+item.earliestFutureTime = item.dateObj.getTime();
+});
 
-        html += `<th style="width:10%">Later Dates</th></tr></thead><tbody>`;
+items.sort((a, b) => {
+if (a.earliestFutureTime !== b.earliestFutureTime) return a.earliestFutureTime - b.earliestFutureTime;
+if (a.freqDays !== b.freqDays) return a.freqDays - b.freqDays;
+return a.name.localeCompare(b.name);
+});
 
-        items.forEach(item => {
-            html += `<tr><td class="n">`;
-            if(item.imgSrc) html += `<img loading="lazy" src="${item.imgSrc}">`;
-            let freqDisplay = item.freq ? `<span class="f">${item.freq}</span>` : '';
-            html += `<div><span class="t">${item.name}</span>${freqDisplay}</div></td>`;
+var allExtrapolatedDates = items.flatMap(i => i.allDates);
+var uniqueDates = [...new Set(allExtrapolatedDates)];
+uniqueDates.sort((a, b) => new Date(a) - new Date(b));
+uniqueDates = uniqueDates.filter(d => new Date(d) >= today);
 
-            colDates.forEach(d => {
-                if(item.allDates.includes(d)) html += `<td><span class="c">✓</span></td>`;
-                else html += `<td></td>`;
-            });
+var maxCols = 5;
+var colDates = uniqueDates.slice(0, maxCols);
+var maxDateObj = new Date(colDates[colDates.length - 1]);
 
-            if(item.nextAfterMax) html += `<td style="color:#555;font-weight:500">${item.nextAfterMax.split(' ').slice(0, 2).join(' ')}</td>`;
-            else html += `<td></td>`;
+items.forEach(item => {
+item.nextAfterMax = '';
+for (var d of item.allDates) {
+if (new Date(d) > maxDateObj) {
+item.nextAfterMax = d;
+break;
+}
+}
+});
 
-            html += `</tr>`;
-        });
+var html = `<html><head><title>Walmart Subscription Calendar v2</title><style></style></head><body><h1>Subscription Calendar v2</h1><table><thead><tr><th style="text-align:left;width:50%">Item</th>`;
 
-        html += `</tbody></table><script>setTimeout(()=>window.print(),500);</script></body></html>`;
+colDates.forEach(d => {
+var displayDate=d.split(' ').slice(0,2).join(' ');
+html += `<th style="width:8%">${displayDate}</th>`;
+});
 
-        let outWin = window.open('', '_blank');
-        if(outWin) {
-            outWin.document.write(html);
-            outWin.document.close();
-        }
-    }
+html += `<th style="width:10%">Later Dates</th></tr></thead><tbody>`;
+
+items.forEach(item => {
+html += `<tr><td class="n">`;
+if(item.imgSrc)html+=`<img loading="lazy" src="${item.imgSrc}">`;
+
+html += `<div><span class="t">${item.name}</span>${item.freq?`<span class="f">${item.freq}</span>`:''}</div></td>`;
+
+colDates.forEach(d => {
+if(item.allDates.includes(d)) {
+html+=`<td><span class="c">✓</span></td>`;
+}else{
+html+=`<td></td>`;
+}
+});
+
+if(item.nextAfterMax){
+html+=`<td >${item.nextAfterMax.split(' ').slice(0,2).join(' ')}</td>`;
+} else {
+html += `<td></td>`;
+}
+
+html += `</tr>`;
+});
+
+html += `</tbody></table><script>setTimeout(()=>window.print(),500);</script></body></html>`;
+
+// Write to the synchronous pop-up window we created at the start
+win.document.open();
+win.document.write(html);
+win.document.close();
+}
 })();
