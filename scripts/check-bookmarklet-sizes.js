@@ -22,7 +22,6 @@ async function checkSizes() {
       });
 
       const finalString = "javascript:" + encodeURIComponent(minified.code);
-      console.log(`\n${finalString}`);
       const byteLength = Buffer.byteLength(finalString, 'utf8');
 
       if (byteLength > MAX_BYTES) {
