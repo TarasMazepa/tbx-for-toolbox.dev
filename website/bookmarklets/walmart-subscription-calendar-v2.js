@@ -14,8 +14,8 @@
 
     let winDocument = win.document;
 
-    let newDate = (x) => new Date(x), querySelectorAll = (x, q) => querySelectorAll(x, q),
-        querySelector = (x, q) => querySelector(x, q), currentYear = newDate().getFullYear(), today = newDate(),
+    let newDate = (x) => new Date(x), querySelectorAll = (x, q) => x.querySelectorAll(q),
+        querySelector = (x, q) => x.querySelector(q), currentYear = newDate().getFullYear(), today = newDate(),
         items = [],
         container = querySelector(document, '[data-testid="subscription-items-container"]') || document,
         cards = querySelectorAll(container, '.pv4');
