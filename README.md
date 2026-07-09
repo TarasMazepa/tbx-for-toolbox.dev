@@ -13,6 +13,16 @@ This repository contains a collection of simple, static web tools and experiment
 - **pages**: Standalone web applications and tools (e.g., Infinity Note).
 - **bookmarklets**: Useful JavaScript snippets that can be saved as bookmarks to enhance browser functionality (e.g., Walmart Delivery Checklist).
 
+## Running Locally (Corporate Proxy Bypass)
+
+If you're behind a corporate proxy and cannot access `tbx-for-toolbox.dev`, you can bypass it by launching the Infinity Note local fetcher as a standalone Chrome application directly from this repository. This uses a blobless clone (`--filter=blob:none`) so the repository remains fully updatable and can switch branches while executing incredibly fast.
+
+**For macOS:**
+`git clone --filter=blob:none https://github.com/TarasMazepa/tbx-for-toolbox.dev.git && "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --app="file://$PWD/tbx-for-toolbox.dev/infinity-note-local/index.html"`
+
+**For Linux / Windows (WSL/Git Bash):**
+`git clone --filter=blob:none https://github.com/TarasMazepa/tbx-for-toolbox.dev.git && google-chrome --app="file://$PWD/tbx-for-toolbox.dev/infinity-note-local/index.html"`
+
 ## Scripts
 
 The root of the repository contains several helper Bash scripts for workflow and git management.
