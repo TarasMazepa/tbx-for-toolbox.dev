@@ -1,0 +1,14 @@
+{
+  "name": "Infinity Note (Local)",
+  "short_name": "Infinity Note",
+  "display": "standalone",
+  "start_url": "./index.html",
+  "background_color": "#ffffff",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
