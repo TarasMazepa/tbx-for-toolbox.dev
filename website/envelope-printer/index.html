@@ -11,17 +11,46 @@
             --accent-color: #b294bb;
             --muted-color: #7c7694;
             --font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            --h-padding: max(2rem, calc(15vw - 5rem));
+            --v-padding: 2rem;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
 
         /* --- Screen/UI Styles --- */
         body {
             font-family: var(--font-family);
             background-color: var(--bg-color);
-            padding: 2rem;
             color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .header {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--v-padding);
+            opacity: 0.8;
+            padding: var(--v-padding) var(--h-padding) 0;
+            z-index: 10;
+        }
+
+        .title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            letter-spacing: -0.025em;
+            color: var(--accent-color);
         }
 
         .no-print {
+            width: 100%;
             max-width: 800px;
             margin: 0 auto 2rem auto;
             background: rgba(255, 255, 255, 0.03);
@@ -34,7 +63,7 @@
         h2 {
             color: var(--accent-color);
             margin-bottom: 1.5rem;
-            font-size: 1.5rem;
+            font-size: 1.25rem;
             font-weight: 600;
         }
 
@@ -155,22 +184,26 @@
 <body>
 
     <!-- UI Controls -->
+    <div class="header no-print">
+        <div class="title">envelope printer</div>
+    </div>
+
     <div class="no-print">
-        <h2>Print a #10 Envelope</h2>
+        <h2>print a #10 envelope</h2>
         <div class="input-group">
             <div class="field">
-                <label for="returnAddress">Return Address</label>
+                <label for="returnAddress">return address</label>
                 <textarea id="returnAddress">Jane Doe
 Acme Corp
 123 Main St
 City, ST 12345</textarea>
             </div>
             <div class="field">
-                <label for="destAddress">Destination Address</label>
+                <label for="destAddress">destination address</label>
                 <textarea id="destAddress" placeholder="Enter recipient address here..."></textarea>
             </div>
         </div>
-        <button onclick="triggerPrint()">Update & Print</button>
+        <button onclick="triggerPrint()">update & print</button>
     </div>
 
     <!-- The Actual Envelope Geometry -->
