@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>envelope printer</title>
+    <style>
+        :root {
+            --bg-color: #1e1d27;
+            --text-color: #eae8f2;
+            --accent-color: #b294bb;
+            --muted-color: #7c7694;
+            --font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            --h-padding: max(2rem, calc(15vw - 5rem));
+            --v-padding: 2rem;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* --- Screen/UI Styles --- */
+        body {
+            font-family: var(--font-family);
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .header {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--v-padding);
+            opacity: 0.8;
+            padding: var(--v-padding) var(--h-padding) 0;
+            z-index: 10;
+        }
+
+        .title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            letter-spacing: -0.025em;
+            color: var(--accent-color);
+        }
+
+        .no-print {
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto 2rem auto;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        h2 {
+            color: var(--accent-color);
+            margin-bottom: 1.5rem;
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 2rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .field {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            color: var(--muted-color);
+        }
+
+        textarea {
+            padding: 0.75rem;
+            background-color: rgba(0, 0, 0, 0.2);
+            color: var(--text-color);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 1rem;
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        button {
+            background-color: var(--accent-color);
+            color: var(--bg-color);
+            border: none;
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+            transition: opacity 0.2s;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        /* --- Envelope Preview on Screen --- */
+        .envelope-preview {
+            width: 9.5in;
+            height: 4.125in;
+            background: white;
+            color: black;
+            margin: 0 auto;
+            position: relative;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+            border: 1px solid #eee;
+        }
+
+        .return-text, .dest-text {
+            white-space: pre-wrap;
+            position: absolute;
+            line-height: 1.4;
+        }
+
+        .return-text {
+            top: 0.4in;
+            left: 0.4in;
+            font-size: 11pt;
+        }
+
+        .dest-text {
+            top: 2in;
+            left: 4in;
+            font-size: 13pt;
+        }
+
+        /* --- Print Styles (macOS dialog formatting) --- */
+        @media print {
+            /* Force the browser to treat the page as a #10 Envelope */
+            @page {
+                size: 9.5in 4.125in;
+                margin: 0;
+            }
+
+            /* Hide everything that isn't the envelope */
+            .no-print, body {
+                background: transparent;
+                padding: 0;
+                margin: 0;
+                box-shadow: none;
+            }
+
+            .no-print {
+                display: none;
+            }
+
+            /* Remove screen styles from the envelope wrapper */
+            .envelope-preview {
+                box-shadow: none;
+                border: none;
+                margin: 0;
+                width: 9.5in;
+                height: 4.125in;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- UI Controls -->
+    <div class="header no-print">
+        <div class="title">envelope printer</div>
+    </div>
+
+    <div class="no-print">
+        <h2>print a #10 envelope</h2>
+        <div class="input-group">
+            <div class="field">
+                <label for="returnAddress">return address</label>
+                <textarea id="returnAddress">Jane Doe
+Acme Corp
+123 Main St
+City, ST 12345</textarea>
+            </div>
+            <div class="field">
+                <label for="destAddress">destination address</label>
+                <textarea id="destAddress" placeholder="Enter recipient address here..."></textarea>
+            </div>
+        </div>
+        <button onclick="triggerPrint()">update & print</button>
+    </div>
+
+    <!-- The Actual Envelope Geometry -->
+    <div class="envelope-preview">
+        <div class="return-text" id="renderReturn"></div>
+        <div class="dest-text" id="renderDest"></div>
+    </div>
+
+    <script>
+        // Sync text areas to the printable div elements
+        function syncText() {
+            document.getElementById('renderReturn').textContent = document.getElementById('returnAddress').value;
+            document.getElementById('renderDest').textContent = document.getElementById('destAddress').value;
+        }
+
+        // Run sync on load and on input
+        syncText();
+        document.getElementById('returnAddress').addEventListener('input', syncText);
+        document.getElementById('destAddress').addEventListener('input', syncText);
+
+        function triggerPrint() {
+            syncText();
+            window.print();
+        }
+    </script>
+</body>
+</html>
