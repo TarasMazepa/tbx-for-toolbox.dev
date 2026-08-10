@@ -213,16 +213,44 @@ City, ST 12345</textarea>
     </div>
 
     <script>
+        const returnAddressEl = document.getElementById('returnAddress');
+        const destAddressEl = document.getElementById('destAddress');
+
+        // Restore from local storage if the browser hasn't restored its own state
+        if (returnAddressEl.value === returnAddressEl.defaultValue) {
+            const savedReturn = localStorage.getItem('envelope_return');
+            if (savedReturn !== null) {
+                returnAddressEl.value = savedReturn;
+            }
+        }
+
+        if (destAddressEl.value === destAddressEl.defaultValue) {
+            const savedDest = localStorage.getItem('envelope_dest');
+            if (savedDest !== null) {
+                destAddressEl.value = savedDest;
+            }
+        }
+
         // Sync text areas to the printable div elements
         function syncText() {
-            document.getElementById('renderReturn').textContent = document.getElementById('returnAddress').value;
-            document.getElementById('renderDest').textContent = document.getElementById('destAddress').value;
+            document.getElementById('renderReturn').textContent = returnAddressEl.value;
+            document.getElementById('renderDest').textContent = destAddressEl.value;
+        }
+
+        function saveToStorage() {
+            localStorage.setItem('envelope_return', returnAddressEl.value);
+            localStorage.setItem('envelope_dest', destAddressEl.value);
+        }
+
+        function handleInput() {
+            syncText();
+            saveToStorage();
         }
 
         // Run sync on load and on input
         syncText();
-        document.getElementById('returnAddress').addEventListener('input', syncText);
-        document.getElementById('destAddress').addEventListener('input', syncText);
+        returnAddressEl.addEventListener('input', handleInput);
+        destAddressEl.addEventListener('input', handleInput);
 
         function triggerPrint() {
             syncText();
