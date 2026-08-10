@@ -216,19 +216,31 @@ City, ST 12345</textarea>
         const returnAddressEl = document.getElementById('returnAddress');
         const destAddressEl = document.getElementById('destAddress');
 
-        // Restore from local storage if the browser hasn't restored its own state
-        if (returnAddressEl.value === returnAddressEl.defaultValue) {
-            const savedReturn = localStorage.getItem('envelope_return');
-            if (savedReturn !== null) {
-                returnAddressEl.value = savedReturn;
-            }
+        function debounce(func, wait) {
+            let timeout;
+            return function(...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), wait);
+            };
         }
 
-        if (destAddressEl.value === destAddressEl.defaultValue) {
-            const savedDest = localStorage.getItem('envelope_dest');
-            if (savedDest !== null) {
-                destAddressEl.value = savedDest;
+        // Restore from local storage if the browser hasn't restored its own state
+        try {
+            if (returnAddressEl.value === returnAddressEl.defaultValue) {
+                const savedReturn = localStorage.getItem('envelope_return');
+                if (savedReturn !== null) {
+                    returnAddressEl.value = savedReturn;
+                }
             }
+
+            if (destAddressEl.value === destAddressEl.defaultValue) {
+                const savedDest = localStorage.getItem('envelope_dest');
+                if (savedDest !== null) {
+                    destAddressEl.value = savedDest;
+                }
+            }
+        } catch (e) {
+            console.warn("Could not read from localStorage:", e);
         }
 
         // Sync text areas to the printable div elements
@@ -238,13 +250,19 @@ City, ST 12345</textarea>
         }
 
         function saveToStorage() {
-            localStorage.setItem('envelope_return', returnAddressEl.value);
-            localStorage.setItem('envelope_dest', destAddressEl.value);
+            try {
+                localStorage.setItem('envelope_return', returnAddressEl.value);
+                localStorage.setItem('envelope_dest', destAddressEl.value);
+            } catch (e) {
+                console.warn("Could not save to localStorage:", e);
+            }
         }
+
+        const debouncedSaveToStorage = debounce(saveToStorage, 500);
 
         function handleInput() {
             syncText();
-            saveToStorage();
+            debouncedSaveToStorage();
         }
 
         // Run sync on load and on input
