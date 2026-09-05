@@ -16,7 +16,7 @@
 
         /* Build compact, print-friendly item row with NORMAL font weight */
         items.push(`
-            <div style="display:flex; align-items:center; padding:12px 0; border-bottom:1px solid #e3e4e5; page-break-inside: avoid;">
+            <div style="display:flex; align-items:center; padding:8px 0; border-bottom:1px solid #e3e4e5; page-break-inside: avoid;">
                 <div style="width:20px; height:20px; border:2px solid #555; border-radius:4px; margin-right:15px; flex-shrink:0;"></div>
                 <div style="font-size:16px; min-width:40px; flex-shrink:0;">${qty}x</div>
                 <div style="width:50px; height:50px; margin-right:15px; flex-shrink:0; display:flex; align-items:center; justify-content:center;">
@@ -33,7 +33,7 @@
     if(items.length > 0) {
         let win = window.open('', '_blank');
         if(win) {
-            win.document.write(`<html><head><title>Walmart Delivery Checklist 2-Col</title><style>@media print{body{padding:0!important;margin:0!important}}</style></head><body style="background-color:#fff;padding:30px;margin:0;font-family:'Bogle', 'Helvetica Neue', Helvetica, Arial, sans-serif;color:#2e2f32;"><div style="max-width:850px;margin:0 auto;"><div style="border-bottom:1px solid #ccc;padding-bottom:4px;margin-bottom:10px;font-size:12px;color:#555;">Walmart Checklist - ${items.length} Items</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:0 40px;">${items.join('')}</div></div><script>setTimeout(()=>window.print(),1500);</script></body></html>`);
+            win.document.write(`<html><head><title>Walmart Delivery Checklist 2-Col</title><style>@media print{body{padding:0!important;margin:0!important}}</style></head><body style="background-color:#fff;padding:10px;margin:0;font-family:'Bogle', 'Helvetica Neue', Helvetica, Arial, sans-serif;color:#2e2f32;"><div style="max-width:850px;margin:0 auto;"><div style="display:grid;grid-template-columns:1fr 1fr;gap:0 40px;">${items.join('')}</div></div><script>setTimeout(()=>window.print(),1500);</script></body></html>`);
             win.document.close();
         } else {
             alert("⚠️ Your browser blocked the pop-up. Please allow pop-ups for Walmart.com to generate the PDF.");
