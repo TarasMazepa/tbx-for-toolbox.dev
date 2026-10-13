@@ -37,3 +37,5 @@ Many of these scripts operate across multiple repositories defined in a local `t
 - `tbx-daily-changes.sh`: Retrieves your daily commit diffs across configured repositories.
 - `tbx-pull-repositories.sh`: Automatically pulls latest changes for all configured repositories.
 - `tbx-sort-git-files.sh`: Sorts tracked files in a git repo based on their latest commit timestamp.
+- `tbx-status-repositories.sh`: Checks configured repositories for uncommitted (staged, unstaged, untracked) changes.
+
