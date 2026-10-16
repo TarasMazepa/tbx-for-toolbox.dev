@@ -32,6 +32,7 @@ git clone --filter=blob:none https://github.com/TarasMazepa/tbx-for-toolbox.dev.
 The root of the repository contains several helper Bash scripts for workflow and git management.
 Many of these scripts operate across multiple repositories defined in a local `till/repositories.txt` file.
 
+- `tbx-check-jules-status.sh`: Audits Jules sessions and PRs to detect PR-less sessions, stuck tasks, and pending follow-ups.
 - `tbx-coach-changes.sh`: Extracts changes from repositories and formats them (e.g. for sharing with a coach or AI).
 - `tbx-combine-files.sh`: Combines contents of files in a directory into a single output.
 - `tbx-daily-changes.sh`: Retrieves your daily commit diffs across configured repositories.
