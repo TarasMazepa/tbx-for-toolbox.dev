@@ -6,6 +6,8 @@ API_KEY="${JULES_API_KEY:-}"
 CONCURRENCY_LIMIT=15
 DAILY_LIMIT=100
 
+CLEAN_DANGLING=false
+
 usage() {
 	echo "Usage: $0 [OPTIONS]"
 	echo ""
@@ -13,6 +15,7 @@ usage() {
 	echo "via the Jules REST API so you know whether you can enqueue more work."
 	echo ""
 	echo "Options:"
+	echo "  --clean, -c           Delete any non-COMPLETED sessions that are FAILED, PAUSED, AWAITING_*, or stuck > 2h"
 	echo "  --api-key <key>       Jules API Key (or set JULES_API_KEY, or save to ~/.jules_api_key)"
 	echo "  -h, --help            Show this help message"
 	echo ""
@@ -22,6 +25,10 @@ usage() {
 
 while [ $# -gt 0 ]; do
 	case "$1" in
+		--clean|-c)
+			CLEAN_DANGLING=true
+			shift
+			;;
 		--api-key)
 			API_KEY="$2"
 			shift 2
@@ -56,6 +63,45 @@ if [ -z "$API_KEY" ]; then
 	exit 1
 fi
 
+if [ "$CLEAN_DANGLING" = true ]; then
+	echo "Scanning all pages for non-COMPLETED sessions (FAILED, PAUSED, AWAITING_*, or stuck > 2h)..."
+	TOKEN=""
+	PAGE=1
+	DELETED_COUNT=0
+	while [ $PAGE -le 20 ]; do
+		URL="https://jules.googleapis.com/v1alpha/sessions?pageSize=100&filter=archived%20%3D%20true%20OR%20archived%20%3D%20false"
+		[ -n "$TOKEN" ] && URL="${URL}&pageToken=${TOKEN}"
+		PAGE_RESP=$(curl -sS -H "X-Goog-Api-Key: $API_KEY" "$URL")
+		CANDIDATES=$(printf '%s\n' "$PAGE_RESP" | jq -r '
+			def parse_ts(s): (s | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601);
+			(.sessions // [])[] |
+			select(.state != "COMPLETED") |
+			select(
+				(.state != "IN_PROGRESS" and .state != "QUEUED" and .state != "PLANNING") or
+				((now - parse_ts(.createTime)) > 7200)
+			) |
+			"\(.id)\t\(.state)\t\(.title // .prompt // "" | gsub("[\\r\\n\\t]+"; " ") | .[0:60])"
+		')
+		if [ -n "$CANDIDATES" ]; then
+			while IFS=$'\t' read -r cid cstate ctitle || [ -n "$cid" ]; do
+				[ -z "$cid" ] && continue
+				del_code=$(curl -sS -o /dev/null -w "%{http_code}" -X DELETE \
+					-H "X-Goog-Api-Key: $API_KEY" \
+					"https://jules.googleapis.com/v1alpha/sessions/$cid")
+				echo "Deleted [$cstate] $cid ($ctitle) -> HTTP $del_code"
+				DELETED_COUNT=$((DELETED_COUNT + 1))
+			done <<EOF
+$CANDIDATES
+EOF
+		fi
+		TOKEN=$(printf '%s\n' "$PAGE_RESP" | jq -r '.nextPageToken // empty')
+		[ -z "$TOKEN" ] && break
+		PAGE=$((PAGE + 1))
+	done
+	echo "Clean complete: deleted $DELETED_COUNT dangling session(s)."
+	echo ""
+fi
+
 RESPONSE=$(curl -sS -H "X-Goog-Api-Key: $API_KEY" \
 	"https://jules.googleapis.com/v1alpha/sessions?pageSize=100&filter=archived%20%3D%20true%20OR%20archived%20%3D%20false")
 
@@ -79,7 +125,7 @@ printf '%s\n' "$RESPONSE" | jq -r \
 	(now - 86400) as $cutoff |
 	(.sessions // []) as $all |
 	($all | map(select(parse_ts(.createTime) >= $cutoff))) as $last24h |
-	($all | map(select(.state != "COMPLETED" and .state != "FAILED"))) as $non_terminal |
+	($all | map(select(.state != "COMPLETED"))) as $non_terminal |
 	($non_terminal | map(select(.state == "IN_PROGRESS"))) as $in_prog |
 	($non_terminal | map(select(.state == "QUEUED" or .state == "PLANNING"))) as $queued |
 	($non_terminal | map(select(.state != "IN_PROGRESS" and .state != "QUEUED" and .state != "PLANNING"))) as $other_active |
@@ -94,7 +140,7 @@ printf '%s\n' "$RESPONSE" | jq -r \
 	"Jules Quota & Concurrency Status",
 	"================================================================================",
 	"Active Concurrency : \($active_count) / \($conc_limit)  (\($in_prog | length) in progress, \($queued | length) queued" +
-		(if ($other_active | length) > 0 then ", \($other_active | length) awaiting/paused" else "" end) +
+		(if ($other_active | length) > 0 then ", \($other_active | length) failed/awaiting/paused" else "" end) +
 		") -> \($conc_avail) slot(s) free",
 	"Rolling 24h Usage  : \($daily_count) / \($daily_limit) + any deleted in 24h -> up to \($daily_avail) slot(s) free",
 	(if $daily_count > 0 then
