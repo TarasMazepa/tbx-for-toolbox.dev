@@ -30,10 +30,63 @@ fi
 "$STATUS_SCRIPT"
 status_exit_code=$?
 
-# If status is not blank (dirty / exit code != 0), stop
+# If status is not blank (dirty / exit code != 0), pull only clean repositories
 if [ $status_exit_code -ne 0 ]; then
+	clean_dirs=()
+	dirty_repos=()
+
+	while IFS= read -r folder || [ -n "$folder" ]; do
+		# Trim leading/trailing whitespace
+		folder="$(echo "${folder}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+
+		# Skip empty lines and comments
+		if [[ -z "$folder" || "$folder" == \#* ]]; then
+			continue
+		fi
+
+		target_dir="$HOME/$folder"
+
+		if [ ! -d "$target_dir" ]; then
+			continue
+		fi
+
+		if ! git -C "$target_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+			continue
+		fi
+
+		repo_status="$(git -C "$target_dir" status --porcelain 2>/dev/null)"
+		if [ -z "$repo_status" ]; then
+			clean_dirs+=("$target_dir")
+		else
+			dirty_repos+=("$folder")
+		fi
+	done <"$REPOS_FILE"
+
+	if [ "${#clean_dirs[@]}" -gt 0 ]; then
+		echo ""
+		echo "Pulling latest changes for ${#clean_dirs[@]} clean repositories (skipping ${#dirty_repos[@]} with uncommitted changes)..."
+		for target_dir in "${clean_dirs[@]}"; do
+			(
+				start_time=$SECONDS
+				echo "Processing $target_dir..."
+				cd "$target_dir" || exit
+				stax pull --force-delete --quiet --decline-all
+				elapsed=$((SECONDS - start_time))
+				echo "Done processing $target_dir in ${elapsed}s"
+			) &
+		done
+		wait
+	else
+		echo ""
+		echo "No clean repositories to pull."
+	fi
+
 	echo ""
-	echo "Aborting pull: repositories have uncommitted changes or errors."
+	echo "Skipped repositories with uncommitted changes:"
+	for folder in "${dirty_repos[@]}"; do
+		echo "  - $folder"
+	done
+	echo ""
 	echo "Once changes are resolved, you can sync again by running:"
 	echo "\"$SCRIPT_DIR/tbx-sync-repositories.sh\""
 	exit "$status_exit_code"
