@@ -40,6 +40,7 @@ Many of these scripts operate across multiple repositories defined in a local `t
 - `tbx-pull-repositories.sh`: Automatically pulls latest changes for all configured repositories.
 - `tbx-sort-git-files.sh`: Sorts tracked files in a git repo based on their latest commit timestamp.
 - `tbx-status-repositories.sh`: Checks configured repositories for uncommitted (staged, unstaged, untracked) changes.
+- `tbx-subl-edit-antigravity-cli-settings.sh`: Opens the Antigravity CLI settings file (~/.gemini/antigravity-cli/settings.json) in Sublime Text.
 - `tbx-sync-repositories.sh`: Checks status across configured repositories and automatically pulls changes for all clean repositories.
 
 
