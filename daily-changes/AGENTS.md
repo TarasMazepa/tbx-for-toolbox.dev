@@ -23,23 +23,40 @@ Read the generated diff file:
 - `daily-changes/generated/daily-changes-latest.txt` (or the specific date file `daily-changes/generated/daily-changes-<date>.txt`).
 - Review the diffs grouped under `===== <repository> =====`.
 
-### 3. Analyze and Summarize
-- **Group by repository**: Keep updates clustered by project.
-- **Focus on value & impact**: Highlight new features, enhancements, bug fixes, refactoring, and releases.
-- **Filter noise**: Omit minor lockfile updates, trivial whitespace/formatting fixes, and internal noise unless significant.
-- **Tone**: Professional, concise, engaging developer voice.
+### 3. Analyze and Summarize (Primary Style: Categorized Highlights)
 
-### 4. Format for Discord
-- **Character limit**: Keep the summary under Discord's 2,000 character message limit (ideally 1,000–1,800 characters).
-- **Discord Markdown**:
-  - Date title: `📅 **Daily Dev Update — <Date>**`
-  - Repo titles with emojis: `🚀 **<repo-name>**`, `✨ **<repo-name>**`, `🛠️ **<repo-name>**`
-  - Bullet points: `- Bullet describing change`
-  - Inline code: Use backticks for CLI commands, function names, flags, and version numbers (e.g. `0.0.18`, `mna`, `pbcopy`).
+The standard and preferred Discord format groups changes by **impact category** across all repositories:
+
+#### Header Pattern
+```markdown
+🚀 **Dev Summary — <Month Day, Year>**
+```
+*(or `🚀 **Dev Summary — <Day of week>, <Month Day, Year>**`)*
+
+#### Standard Category Sections
+Include only the categories that have changes for that day:
+- `**✨ New Features & Tooling**`
+  New capabilities, tools, scripts, CLI flags, APIs, UI widgets, workflows.
+- `**🛠️ Improvements & Fixes**`
+  Bug fixes, performance optimizations, error handling, refactors, cleanup.
+- `**📦 Releases & Packaging**`
+  Version bumps, releases, Homebrew formulas, package dependency updates.
+- `**⚙️ Global Standards & Tooling**` (or `**📚 Documentation & Standards**`)
+  Rule updates across `AGENTS.md`, guides, or workflow standards.
+
+#### Bullet Writing Style
+- **Prefix with repo**: `- **<repo-name>**: <Action verb> <description>`
+- **Active past-tense verbs**: `Added...`, `Created...`, `Implemented...`, `Refactored...`, `Published...`, `Bumped...`, `Overhauled...`.
+- **Code formatting**: Always use backticks for CLI commands, function/class names, flags, and version numbers (e.g. `mna@0.0.18`, `docker image prune --force`, `Flag`).
+- **High signal**: Keep bullets punchy, clear, and focused on value and impact.
+
+### 4. Format & Length
+- Keep the summary under Discord's 2,000 character limit (aim for 800–1,600 characters).
+- Separate categories with a single blank line.
 
 ### 5. Save Summary & Copy to Clipboard
 Write the Discord summary to `daily-changes/generated/daily-summary-latest.md` (and `daily-changes/generated/daily-summary-<date>.md`).
-Then copy it to the clipboard using the appropriate platform command:
+Then copy it to the clipboard:
 
 **macOS:**
 ```bash
@@ -57,37 +74,13 @@ fi
 
 ### 6. Present Response to User
 - Display the generated Discord summary in your response.
-- Explicitly confirm to the user that the summary has been copied to their clipboard and is ready to paste into Discord (`Cmd+V` / `Ctrl+V`).
+- Explicitly confirm that the summary has been copied to the clipboard and is ready to paste into Discord (`Cmd+V` / `Ctrl+V`).
 
 ---
 
-## Sample Summaries
+## Primary Style Reference Example
 
-### Sample 1: Repo-Grouped Update (Recommended)
-
-```markdown
-📅 **Daily Dev Update — Oct 18, 2026**
-
-🚀 **homebrew-monoapp**
-- Released `mna` formula `0.0.18` with verified SHA-256 checksums for macOS ARM & Linux x64
-- Added versioned formula `mna@0.0.18.rb` for pinned installations
-
-🛠️ **monoapp**
-- Bumped version to `0.0.18`
-- Added automatic `docker image prune --force` after pulling practice reading containers to keep disk space clean
-
-🧹 **monolib**
-- Refactored CLI `Flag` specification architecture with cleaner mutating argument parsing
-- Modernized flag finding and doc comments
-
-✨ **tbx-for-toolbox.dev**
-- Added `tbx-subl-edit-antigravity-cli-settings.sh` for one-command editing of Antigravity CLI configuration in Sublime Text
-- Enhanced `tbx-daily-changes.sh` with smart time defaults and Discord workflow
-```
-
----
-
-### Sample 2: Categorized Highlights
+### Categorized Highlights (Standard Default)
 
 ```markdown
 🚀 **Dev Summary — Oct 18, 2026**
@@ -106,12 +99,43 @@ fi
 
 ---
 
-### Sample 3: Compact Daily Pulse
+## Alternative Style Reference Examples
 
-```markdown
-**Dev Pulse — Oct 18, 2026** ⚡
-- **Tooling**: Added Sublime Text helper for Antigravity CLI configuration in `tbx-for-toolbox.dev`
-- **Monoapp (v0.0.18)**: Released updated CLI build; automated Docker image cleanup on reading fetches
-- **Packaging**: Updated Homebrew tap formulas with SHA-256 hashes for macOS and Linux
-- **Monolib**: Refactored command-line flag parser architecture
+### Alternative 1: Repository-Grouped Update
+
+```text
+🚀 Dev Update | Sunday, March 29, 2026
+
+🛠️ stax
+Created Stax Workflows Guide and integrated it into the web documentation.
+Refactored internal commands and context to support asynchronous execution for Git operations.
+Migrated file I/O retry logic to monolib_dart.
+
+🤖 ai-todo
+Converted CLI and prompt setup to asynchronous execution.
+Refactored item processing to use asynchronous JSONL encoding.
+Bumped monolib_dart dependency to 0.0.12.
+
+📚 monolib
+Released monolib_dart 0.0.12.
+Implemented jsonlEncodeAsync for non-blocking JSONL output.
+```
+
+### Alternative 2: Cross-Repo Standards & Maintenance
+
+```text
+🚀 Dev Update | Wednesday, April 1, 2026
+
+🤖 ai-todo
+Implemented Batcher for optimized asynchronous logging and tracing.
+Bumped monolib_dart dependency to 0.0.17.
+
+📚 monolib
+Released monolib_dart 0.0.17 with enhanced Batcher and OnStreamOfListOfInt extension.
+
+🛠️ stax
+Integrated mainButcher for lifecycle management of asynchronous batch operations.
+
+⚙️ General Updates
+Updated AGENTS.md across all projects to mandate avoiding stdin.readLineSync() refactors to async.
 ```
