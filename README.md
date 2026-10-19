@@ -32,11 +32,13 @@ git clone --filter=blob:none https://github.com/TarasMazepa/tbx-for-toolbox.dev.
 The root of the repository contains several helper Bash scripts for workflow and git management.
 Many of these scripts operate across multiple repositories defined in a local `till/repositories.txt` file.
 
-- `tbx-check-jules-status.sh`: Audits Jules sessions and PRs to detect PR-less sessions, stuck tasks, and pending follow-ups.
 - `tbx-coach-changes.sh`: Extracts changes from repositories and formats them (e.g. for sharing with a coach or AI).
 - `tbx-combine-files.sh`: Combines contents of files in a directory into a single output.
 - `tbx-daily-changes.sh`: Gathers daily commit diffs across configured repositories into `daily-changes/generated/` with smart time defaults and date options.
-- `tbx-jules-status.sh`: Checks Jules active concurrency and rolling 24-hour quota usage via the REST API to see if more work can be enqueued.
+- `tbx-jules-clean.sh`: Scans all Jules sessions across all pages, identifies failed, paused, or awaiting sessions, and confirms deletion.
+- `tbx-jules-queue.sh`: Dispatches tasks to Google Jules via the REST API with auto-PR mode, dry-run previews, and quota status checks.
+- `tbx-jules-quota.sh`: Checks Jules active concurrency and rolling 24-hour quota usage via the REST API to see if more work can be enqueued.
+- `tbx-jules-status.sh`: Audits Jules sessions and PRs to detect PR-less sessions, stuck tasks, and pending follow-ups.
 - `tbx-pull-repositories.sh`: Automatically pulls latest changes for all configured repositories.
 - `tbx-sort-git-files.sh`: Sorts tracked files in a git repo based on their latest commit timestamp.
 - `tbx-status-repositories.sh`: Checks configured repositories for uncommitted (staged, unstaged, untracked) changes.
