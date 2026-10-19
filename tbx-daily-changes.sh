@@ -10,19 +10,61 @@ if [ ! -f "$REPOS_FILE" ]; then
 	exit 1
 fi
 
-if [[ "$OSTYPE" == "darwin"* ]]; then
-	START_DATE=$(date -v-1d +"%Y-%m-%d 00:00:00")
-else
-	START_DATE=$(date -d "yesterday" +"%Y-%m-%d 00:00:00")
+if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+	echo "Usage: $(basename "$0") [today|yesterday|YYYY-MM-DD] [output-dir]"
+	echo "Gathers git diffs across all repositories listed in till/repositories.txt."
+	echo ""
+	echo "Options:"
+	echo "  today       Gather changes for today (00:00:00 to 23:59:59)"
+	echo "  yesterday   Gather changes for yesterday (00:00:00 to 23:59:59)"
+	echo "  YYYY-MM-DD  Gather changes for specific date (00:00:00 to 23:59:59)"
+	echo "  (default)   Smart default: 'yesterday' before 17:00 (5 PM), 'today' at or after 17:00"
+	exit 0
 fi
-END_DATE=$(date +"%Y-%m-%d 00:00:00")
+
+TARGET="$1"
+if [ -z "$TARGET" ]; then
+	CURRENT_HOUR=$(date +"%H" | awk '{print int($1)}')
+	if [ "$CURRENT_HOUR" -ge 17 ]; then
+		TARGET="today"
+	else
+		TARGET="yesterday"
+	fi
+fi
+
+if [ "$TARGET" = "today" ]; then
+	DATE_LABEL=$(date +"%Y-%m-%d")
+	START_DATE="${DATE_LABEL} 00:00:00"
+	END_DATE="${DATE_LABEL} 23:59:59"
+elif [ "$TARGET" = "yesterday" ]; then
+	if [[ "$OSTYPE" == "darwin"* ]]; then
+		DATE_LABEL=$(date -v-1d +"%Y-%m-%d")
+	else
+		DATE_LABEL=$(date -d "yesterday" +"%Y-%m-%d")
+	fi
+	START_DATE="${DATE_LABEL} 00:00:00"
+	END_DATE="${DATE_LABEL} 23:59:59"
+else
+	if [[ ! "$TARGET" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+		echo "Error: Invalid date or target '$TARGET'. Expected 'today', 'yesterday', or 'YYYY-MM-DD'."
+		exit 1
+	fi
+	DATE_LABEL="$TARGET"
+	START_DATE="${DATE_LABEL} 00:00:00"
+	END_DATE="${DATE_LABEL} 23:59:59"
+fi
+
 EMPTY_TREE_HASH="4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
-OUTPUT_FILE="$PWD/daily_changes.txt"
+OUTPUT_DIR="${2:-${DAILY_CHANGES_DIR:-$SCRIPT_DIR/daily-changes/generated}}"
+mkdir -p "$OUTPUT_DIR"
+OUTPUT_FILE="$OUTPUT_DIR/daily-changes-${DATE_LABEL}.txt"
+LATEST_FILE="$OUTPUT_DIR/daily-changes-latest.txt"
+
 # shellcheck disable=SC2188
 >"$OUTPUT_FILE" # Clear or create file
 
-echo "Gathering changes from $START_DATE to $END_DATE..."
+echo "Gathering changes for $DATE_LABEL ($START_DATE to $END_DATE)..."
 
 while read -r folder || [ -n "$folder" ]; do
 	# Skip empty lines and comments
@@ -69,4 +111,14 @@ while read -r folder || [ -n "$folder" ]; do
 	fi
 done <"$REPOS_FILE"
 
-echo "Changes combined into $OUTPUT_FILE"
+cp "$OUTPUT_FILE" "$LATEST_FILE"
+
+if [ -s "$OUTPUT_FILE" ]; then
+	echo "Changes combined into $OUTPUT_FILE"
+	echo "Latest copy updated at $LATEST_FILE"
+else
+	echo "No changes found for $DATE_LABEL."
+	echo "Empty report created at $OUTPUT_FILE"
+	echo "Latest copy updated at $LATEST_FILE"
+fi
+

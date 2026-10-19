@@ -35,7 +35,7 @@ Many of these scripts operate across multiple repositories defined in a local `t
 - `tbx-check-jules-status.sh`: Audits Jules sessions and PRs to detect PR-less sessions, stuck tasks, and pending follow-ups.
 - `tbx-coach-changes.sh`: Extracts changes from repositories and formats them (e.g. for sharing with a coach or AI).
 - `tbx-combine-files.sh`: Combines contents of files in a directory into a single output.
-- `tbx-daily-changes.sh`: Retrieves your daily commit diffs across configured repositories.
+- `tbx-daily-changes.sh`: Gathers daily commit diffs across configured repositories into `daily-changes/generated/` with smart time defaults and date options.
 - `tbx-jules-status.sh`: Checks Jules active concurrency and rolling 24-hour quota usage via the REST API to see if more work can be enqueued.
 - `tbx-pull-repositories.sh`: Automatically pulls latest changes for all configured repositories.
 - `tbx-sort-git-files.sh`: Sorts tracked files in a git repo based on their latest commit timestamp.
