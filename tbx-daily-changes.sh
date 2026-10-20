@@ -10,19 +10,47 @@ if [ ! -f "$REPOS_FILE" ]; then
 	exit 1
 fi
 
-if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-	echo "Usage: $(basename "$0") [today|yesterday|YYYY-MM-DD] [output-dir]"
-	echo "Gathers git diffs across all repositories listed in till/repositories.txt."
-	echo ""
-	echo "Options:"
-	echo "  today       Gather changes for today (00:00:00 to 23:59:59)"
-	echo "  yesterday   Gather changes for yesterday (00:00:00 to 23:59:59)"
-	echo "  YYYY-MM-DD  Gather changes for specific date (00:00:00 to 23:59:59)"
-	echo "  (default)   Smart default: 'yesterday' before 17:00 (5 PM), 'today' at or after 17:00"
-	exit 0
-fi
+FETCH=true
+TARGET=""
+OUTPUT_DIR=""
 
-TARGET="$1"
+while [ $# -gt 0 ]; do
+	case "$1" in
+		--no-fetch)
+			FETCH=false
+			shift
+			;;
+		--fetch)
+			FETCH=true
+			shift
+			;;
+		-h|--help)
+			echo "Usage: $(basename "$0") [OPTIONS] [today|yesterday|YYYY-MM-DD] [output-dir]"
+			echo "Gathers git diffs across all repositories listed in till/repositories.txt."
+			echo ""
+			echo "Options:"
+			echo "  --no-fetch  Skip git fetch for repositories before diffing"
+			echo "  --fetch     Fetch repositories from origin before diffing (default)"
+			echo "  -h, --help  Show this help message"
+			echo ""
+			echo "Date Arguments:"
+			echo "  today       Gather changes for today (00:00:00 to 23:59:59)"
+			echo "  yesterday   Gather changes for yesterday (00:00:00 to 23:59:59)"
+			echo "  YYYY-MM-DD  Gather changes for specific date (00:00:00 to 23:59:59)"
+			echo "  (default)   Smart default: 'yesterday' before 17:00 (5 PM), 'today' at or after 17:00"
+			exit 0
+			;;
+		*)
+			if [ -z "$TARGET" ]; then
+				TARGET="$1"
+			elif [ -z "$OUTPUT_DIR" ]; then
+				OUTPUT_DIR="$1"
+			fi
+			shift
+			;;
+	esac
+done
+
 if [ -z "$TARGET" ]; then
 	CURRENT_HOUR=$(date +"%H" | awk '{print int($1)}')
 	if [ "$CURRENT_HOUR" -ge 17 ]; then
@@ -56,7 +84,7 @@ fi
 
 EMPTY_TREE_HASH="4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
-OUTPUT_DIR="${2:-${DAILY_CHANGES_DIR:-$SCRIPT_DIR/daily-changes/generated}}"
+OUTPUT_DIR="${OUTPUT_DIR:-${DAILY_CHANGES_DIR:-$SCRIPT_DIR/daily-changes/generated}}"
 mkdir -p "$OUTPUT_DIR"
 OUTPUT_FILE="$OUTPUT_DIR/daily-changes-${DATE_LABEL}.txt"
 LATEST_FILE="$OUTPUT_DIR/daily-changes-latest.txt"
@@ -78,10 +106,26 @@ while read -r folder || [ -n "$folder" ]; do
 		(
 			cd "$target_dir" || exit 1 # Exits the subshell, skipping to next repo
 			if [ -d ".git" ]; then
+				if [ "$FETCH" = true ]; then
+					git fetch --quiet origin 2>/dev/null || true
+				fi
+
+				# Determine target branch (prefer origin/main, main, origin/master, master, falling back to HEAD)
+				TARGET_REF=""
+				for candidate in "origin/main" "main" "origin/master" "master"; do
+					if git rev-parse --verify "$candidate" >/dev/null 2>&1; then
+						TARGET_REF="$candidate"
+						break
+					fi
+				done
+				if [ -z "$TARGET_REF" ]; then
+					TARGET_REF="HEAD"
+				fi
+
 				# Find the last commit BEFORE start date
-				START_COMMIT=$(git rev-list -1 --before="$START_DATE" HEAD 2>/dev/null)
+				START_COMMIT=$(git rev-list -1 --before="$START_DATE" "$TARGET_REF" 2>/dev/null)
 				# Find the last commit BEFORE end date
-				END_COMMIT=$(git rev-list -1 --before="$END_DATE" HEAD 2>/dev/null)
+				END_COMMIT=$(git rev-list -1 --before="$END_DATE" "$TARGET_REF" 2>/dev/null)
 
 				if [ -n "$START_COMMIT" ] && [ -n "$END_COMMIT" ] && [ "$START_COMMIT" != "$END_COMMIT" ]; then
 					CHANGES=$(git diff "$START_COMMIT" "$END_COMMIT")
