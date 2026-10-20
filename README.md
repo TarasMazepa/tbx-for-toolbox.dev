@@ -12,37 +12,37 @@ This repository contains a collection of simple, static web tools and experiment
 
 - **pages**: Standalone web applications and tools (e.g., Infinity Note).
 - **bookmarklets**: Useful JavaScript snippets that can be saved as bookmarks to enhance browser functionality (e.g., Walmart Delivery Checklist).
+- **scripts & tools**: Automation, multi-repository management, Google Jules task orchestration, and Antigravity CLI tools.
 
-## Running Locally (Corporate Proxy Bypass)
+## Website
 
-If you're behind a corporate proxy and cannot access `tbx-for-toolbox.dev`, you can bypass it by launching the Infinity Note local fetcher as a standalone Chrome application directly from this repository. This uses a blobless clone (`--filter=blob:none`) so the repository remains fully updatable and can switch branches while executing incredibly fast.
+All web tools, pages, and bookmarklets are hosted live at **[https://tbx-for-toolbox.dev/](https://tbx-for-toolbox.dev/)**.
 
-**For macOS:**
-```
-git clone --filter=blob:none https://github.com/TarasMazepa/tbx-for-toolbox.dev.git && "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --app="file://$PWD/tbx-for-toolbox.dev/infinity-note-local/index.html"
-```
+## Scripts & CLI Tools
 
-**For Linux / Windows (WSL/Git Bash):**
-```
-git clone --filter=blob:none https://github.com/TarasMazepa/tbx-for-toolbox.dev.git && google-chrome --app="file://$PWD/tbx-for-toolbox.dev/infinity-note-local/index.html"
-```
+The root of the repository contains helper Bash scripts for workflow automation, git operations across multiple checkouts (configured in `till/repositories.txt`), Google Jules orchestration, and Antigravity CLI settings management.
 
-## Scripts
-
-The root of the repository contains several helper Bash scripts for workflow and git management.
-Many of these scripts operate across multiple repositories defined in a local `till/repositories.txt` file.
-
-- `tbx-coach-changes.sh`: Extracts changes from repositories and formats them (e.g. for sharing with a coach or AI).
-- `tbx-combine-files.sh`: Combines contents of files in a directory into a single output.
-- `tbx-daily-changes.sh`: Gathers daily commit diffs across configured repositories into `daily-changes/generated/` with smart time defaults and date options.
-- `tbx-jules-clean.sh`: Scans all Jules sessions across all pages, identifies failed, paused, or awaiting sessions, and confirms deletion.
-- `tbx-jules-queue.sh`: Dispatches tasks to Google Jules via the REST API with auto-PR mode, dry-run previews, and quota status checks.
-- `tbx-jules-quota.sh`: Checks Jules active concurrency and rolling 24-hour quota usage via the REST API to see if more work can be enqueued.
-- `tbx-jules-status.sh`: Audits Jules sessions and PRs to detect PR-less sessions, stuck tasks, and pending follow-ups.
+### Multi-Repository & Git Management
+Operates across all checked-out repositories defined in `till/repositories.txt`:
+- `tbx-daily-changes.sh`: Gathers daily commit diffs across configured repositories into `daily-changes/generated/` with smart time defaults, date selection, origin auto-fetching, and canonical branch targeting (`origin/main`, `main`, etc.). Follows `daily-changes/AGENTS.md` for Discord summary generation.
+- `tbx-sync-repositories.sh`: Audits status across configured repositories and automatically pulls updates for all clean repositories.
+- `tbx-status-repositories.sh`: Scans configured repositories for uncommitted changes (staged, unstaged, untracked).
 - `tbx-pull-repositories.sh`: Automatically pulls latest changes for all configured repositories.
+- `tbx-coach-changes.sh`: Extracts changes from repositories and formats them (e.g., for coaching or LLM review).
 - `tbx-sort-git-files.sh`: Sorts tracked files in a git repo based on their latest commit timestamp.
-- `tbx-status-repositories.sh`: Checks configured repositories for uncommitted (staged, unstaged, untracked) changes.
-- `tbx-subl-edit-antigravity-cli-settings.sh`: Opens the Antigravity CLI settings file (~/.gemini/antigravity-cli/settings.json) in Sublime Text.
-- `tbx-sync-repositories.sh`: Checks status across configured repositories and automatically pulls changes for all clean repositories.
+- `tbx-combine-files.sh`: Combines contents of files in a directory into a single consolidated output file.
+
+### Google Jules Automation (`tbx-jules-*`)
+Suite of REST-based tools for managing and monitoring Google Jules tasks:
+- `tbx-jules-queue.sh`: General-purpose tool to dispatch tasks to Google Jules via the REST API with automatic PR mode, plan approval toggles, dry-run previews, and quota checks.
+- `tbx-jules-quota.sh`: Monitors Jules active concurrency (slots in progress/queued vs limit) and rolling 24-hour usage with rollover countdowns.
+- `tbx-jules-status.sh`: Audits Jules sessions and pull requests across repositories to identify completed tasks without PRs, stuck/failed sessions, and open PRs pending comments.
+- `tbx-jules-clean.sh`: Scans all Jules sessions across all pages, lists failed, paused, or awaiting sessions, and confirms interactive batch deletion.
+
+### Antigravity CLI Tooling
+Helpers for managing Antigravity CLI settings (`~/.gemini/antigravity-cli/settings.json`):
+- `tbx-add-antigravity-cli-allow.sh`: Adds command patterns to `permissions.allow` in the Antigravity settings file if not already present.
+- `tbx-sort-antigravity-cli-settings.sh`: Sorts `permissions.allow` in the settings file deterministically.
+- `tbx-subl-edit-antigravity-cli-settings.sh`: Opens the Antigravity CLI settings file in Sublime Text.
 
 
