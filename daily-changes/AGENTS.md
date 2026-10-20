@@ -9,8 +9,10 @@ When the user asks for a daily summary (e.g. *"give me a daily summary"*, *"summ
 ### 1. Run the Changes Collector Script
 Run `tbx-daily-changes.sh` from the repository root (or `../tbx-daily-changes.sh` if currently inside `daily-changes/`):
 ```bash
-./tbx-daily-changes.sh [today|yesterday|YYYY-MM-DD]
+./tbx-daily-changes.sh [--no-fetch] [today|yesterday|YYYY-MM-DD]
 ```
+- **Smart branch resolution**: Automatically fetches and targets the canonical default branch (`origin/main`, `main`, `master`) across all repositories, ignoring local unmerged feature branches.
+- **Auto-fetch**: Fetches latest refs from `origin` by default before inspecting diffs (pass `--no-fetch` to skip).
 - **Smart default**: If invoked without arguments, it automatically gathers **yesterday** before 17:00 (5 PM), and **today** at or after 17:00 (5 PM).
 - Pass `today` to force today's commits.
 - Pass `yesterday` to force yesterday's commits.
