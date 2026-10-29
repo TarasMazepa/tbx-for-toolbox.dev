@@ -2,6 +2,7 @@
 
 ## General
 - Check `MORE-AGENTS.md` if present.
+- Check `till/agents.md` if present (not tracked in repository; may contain local checkout or user-specific instructions and prompts).
 - Keep project folder structure flat; avoid nested directories.
 - Prefer `kebab-case` over `snake_case`, `camelCase`, or other naming conventions.
 - Use `~` or `$HOME` (or relative paths) instead of hardcoded `/Users/<username>` paths (`tm` vs `tarasmazepa`).
