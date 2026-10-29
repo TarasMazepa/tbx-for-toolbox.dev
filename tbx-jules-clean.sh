@@ -22,31 +22,31 @@ usage() {
 
 while [ $# -gt 0 ]; do
 	case "$1" in
-		-y|--yes)
-			AUTO_CONFIRM=true
-			shift
-			;;
-		--api-key)
-			API_KEY="$2"
-			shift 2
-			;;
-		-h|--help)
-			usage
-			exit 0
-			;;
-		*)
-			echo "Error: Unknown option '$1'" >&2
-			echo "Run '$(basename "$0") --help' for usage." >&2
-			exit 1
-			;;
+	-y | --yes)
+		AUTO_CONFIRM=true
+		shift
+		;;
+	--api-key)
+		API_KEY="$2"
+		shift 2
+		;;
+	-h | --help)
+		usage
+		exit 0
+		;;
+	*)
+		echo "Error: Unknown option '$1'" >&2
+		echo "Run '$(basename "$0") --help' for usage." >&2
+		exit 1
+		;;
 	esac
 done
 
 if [ -z "$API_KEY" ]; then
 	if [ -f "$SCRIPT_DIR/.jules_api_key" ]; then
-		API_KEY="$(tr -d '[:space:]' < "$SCRIPT_DIR/.jules_api_key")"
+		API_KEY="$(tr -d '[:space:]' <"$SCRIPT_DIR/.jules_api_key")"
 	elif [ -f "$HOME/.jules_api_key" ]; then
-		API_KEY="$(tr -d '[:space:]' < "$HOME/.jules_api_key")"
+		API_KEY="$(tr -d '[:space:]' <"$HOME/.jules_api_key")"
 	fi
 fi
 

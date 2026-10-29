@@ -12,7 +12,7 @@ usage() {
 	echo "Any additional arguments are forwarded directly to 'subl'."
 	echo ""
 	echo "Example command:"
-	echo "$(basename "$0")"
+	basename "$0"
 }
 
 if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
@@ -42,7 +42,7 @@ if [ ! -d "$SETTINGS_DIR" ]; then
 fi
 
 if [ ! -f "$SETTINGS_FILE" ]; then
-	echo "{}" > "$SETTINGS_FILE"
+	echo "{}" >"$SETTINGS_FILE"
 	echo "Initialized settings file at $SETTINGS_FILE"
 fi
 

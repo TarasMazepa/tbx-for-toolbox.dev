@@ -25,32 +25,32 @@ usage() {
 
 while [ $# -gt 0 ]; do
 	case "$1" in
-		--clean|-c)
-			CLEAN_DANGLING=true
-			shift
-			;;
-		--api-key)
-			API_KEY="$2"
-			shift 2
-			;;
-		-h|--help)
-			usage
-			exit 0
-			;;
-		*)
-			echo "Error: Unknown argument '$1'" >&2
-			echo "Run with --help to see usage:" >&2
-			echo "$0 --help" >&2
-			exit 1
-			;;
+	--clean | -c)
+		CLEAN_DANGLING=true
+		shift
+		;;
+	--api-key)
+		API_KEY="$2"
+		shift 2
+		;;
+	-h | --help)
+		usage
+		exit 0
+		;;
+	*)
+		echo "Error: Unknown argument '$1'" >&2
+		echo "Run with --help to see usage:" >&2
+		echo "$0 --help" >&2
+		exit 1
+		;;
 	esac
 done
 
 if [ -z "$API_KEY" ]; then
 	if [ -f "$SCRIPT_DIR/.jules_api_key" ]; then
-		API_KEY="$(tr -d '[:space:]' < "$SCRIPT_DIR/.jules_api_key")"
+		API_KEY="$(tr -d '[:space:]' <"$SCRIPT_DIR/.jules_api_key")"
 	elif [ -f "$HOME/.jules_api_key" ]; then
-		API_KEY="$(tr -d '[:space:]' < "$HOME/.jules_api_key")"
+		API_KEY="$(tr -d '[:space:]' <"$HOME/.jules_api_key")"
 	fi
 fi
 

@@ -45,80 +45,80 @@ usage() {
 # Parse options
 while [ $# -gt 0 ]; do
 	case "$1" in
-		--execute|-x)
-			DRY_RUN=false
-			shift
-			;;
-		--dry-run)
-			DRY_RUN=true
-			shift
-			;;
-		--prompt|-p)
-			PROMPT="$2"
-			shift 2
-			;;
-		--prompt-file|-f)
-			PROMPT_FILE="$2"
-			shift 2
-			;;
-		--title|-t)
-			TITLE="$2"
-			shift 2
-			;;
-		--repo|-r)
-			REPO="$2"
-			shift 2
-			;;
-		--branch|-b)
-			BRANCH="$2"
-			shift 2
-			;;
-		--auto-pr)
-			AUTOMATION_MODE="AUTO_CREATE_PR"
-			shift
-			;;
-		--no-auto-pr)
-			AUTOMATION_MODE="MANUAL"
-			shift
-			;;
-		--require-plan-approval)
-			REQUIRE_PLAN_APPROVAL=true
-			shift
-			;;
-		--no-plan-approval)
-			REQUIRE_PLAN_APPROVAL=false
-			shift
-			;;
-		--api-key)
-			API_KEY="$2"
-			shift 2
-			;;
-		--no-status)
-			SHOW_STATUS=false
-			shift
-			;;
-		-h|--help)
-			usage
-			exit 0
-			;;
-		--)
-			shift
-			break
-			;;
-		-*)
-			echo "Error: Unknown option '$1'" >&2
-			echo "Run '$(basename "$0") --help' for usage." >&2
-			exit 1
-			;;
-		*)
-			# Positional prompt if not already set
-			if [ -z "$PROMPT" ]; then
-				PROMPT="$1"
-			else
-				PROMPT="$PROMPT $1"
-			fi
-			shift
-			;;
+	--execute | -x)
+		DRY_RUN=false
+		shift
+		;;
+	--dry-run)
+		DRY_RUN=true
+		shift
+		;;
+	--prompt | -p)
+		PROMPT="$2"
+		shift 2
+		;;
+	--prompt-file | -f)
+		PROMPT_FILE="$2"
+		shift 2
+		;;
+	--title | -t)
+		TITLE="$2"
+		shift 2
+		;;
+	--repo | -r)
+		REPO="$2"
+		shift 2
+		;;
+	--branch | -b)
+		BRANCH="$2"
+		shift 2
+		;;
+	--auto-pr)
+		AUTOMATION_MODE="AUTO_CREATE_PR"
+		shift
+		;;
+	--no-auto-pr)
+		AUTOMATION_MODE="MANUAL"
+		shift
+		;;
+	--require-plan-approval)
+		REQUIRE_PLAN_APPROVAL=true
+		shift
+		;;
+	--no-plan-approval)
+		REQUIRE_PLAN_APPROVAL=false
+		shift
+		;;
+	--api-key)
+		API_KEY="$2"
+		shift 2
+		;;
+	--no-status)
+		SHOW_STATUS=false
+		shift
+		;;
+	-h | --help)
+		usage
+		exit 0
+		;;
+	--)
+		shift
+		break
+		;;
+	-*)
+		echo "Error: Unknown option '$1'" >&2
+		echo "Run '$(basename "$0") --help' for usage." >&2
+		exit 1
+		;;
+	*)
+		# Positional prompt if not already set
+		if [ -z "$PROMPT" ]; then
+			PROMPT="$1"
+		else
+			PROMPT="$PROMPT $1"
+		fi
+		shift
+		;;
 	esac
 done
 
@@ -183,9 +183,9 @@ fi
 # Resolve API Key
 if [ -z "$API_KEY" ]; then
 	if [ -f "$SCRIPT_DIR/.jules_api_key" ]; then
-		API_KEY="$(tr -d '[:space:]' < "$SCRIPT_DIR/.jules_api_key")"
+		API_KEY="$(tr -d '[:space:]' <"$SCRIPT_DIR/.jules_api_key")"
 	elif [ -f "$HOME/.jules_api_key" ]; then
-		API_KEY="$(tr -d '[:space:]' < "$HOME/.jules_api_key")"
+		API_KEY="$(tr -d '[:space:]' <"$HOME/.jules_api_key")"
 	fi
 fi
 

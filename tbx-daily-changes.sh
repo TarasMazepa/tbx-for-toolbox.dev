@@ -16,38 +16,38 @@ OUTPUT_DIR=""
 
 while [ $# -gt 0 ]; do
 	case "$1" in
-		--no-fetch)
-			FETCH=false
-			shift
-			;;
-		--fetch)
-			FETCH=true
-			shift
-			;;
-		-h|--help)
-			echo "Usage: $(basename "$0") [OPTIONS] [today|yesterday|YYYY-MM-DD] [output-dir]"
-			echo "Gathers git diffs across all repositories listed in till/repositories.txt."
-			echo ""
-			echo "Options:"
-			echo "  --no-fetch  Skip git fetch for repositories before diffing"
-			echo "  --fetch     Fetch repositories from origin before diffing (default)"
-			echo "  -h, --help  Show this help message"
-			echo ""
-			echo "Date Arguments:"
-			echo "  today       Gather changes for today (00:00:00 to 23:59:59)"
-			echo "  yesterday   Gather changes for yesterday (00:00:00 to 23:59:59)"
-			echo "  YYYY-MM-DD  Gather changes for specific date (00:00:00 to 23:59:59)"
-			echo "  (default)   Smart default: 'yesterday' before 17:00 (5 PM), 'today' at or after 17:00"
-			exit 0
-			;;
-		*)
-			if [ -z "$TARGET" ]; then
-				TARGET="$1"
-			elif [ -z "$OUTPUT_DIR" ]; then
-				OUTPUT_DIR="$1"
-			fi
-			shift
-			;;
+	--no-fetch)
+		FETCH=false
+		shift
+		;;
+	--fetch)
+		FETCH=true
+		shift
+		;;
+	-h | --help)
+		echo "Usage: $(basename "$0") [OPTIONS] [today|yesterday|YYYY-MM-DD] [output-dir]"
+		echo "Gathers git diffs across all repositories listed in till/repositories.txt."
+		echo ""
+		echo "Options:"
+		echo "  --no-fetch  Skip git fetch for repositories before diffing"
+		echo "  --fetch     Fetch repositories from origin before diffing (default)"
+		echo "  -h, --help  Show this help message"
+		echo ""
+		echo "Date Arguments:"
+		echo "  today       Gather changes for today (00:00:00 to 23:59:59)"
+		echo "  yesterday   Gather changes for yesterday (00:00:00 to 23:59:59)"
+		echo "  YYYY-MM-DD  Gather changes for specific date (00:00:00 to 23:59:59)"
+		echo "  (default)   Smart default: 'yesterday' before 17:00 (5 PM), 'today' at or after 17:00"
+		exit 0
+		;;
+	*)
+		if [ -z "$TARGET" ]; then
+			TARGET="$1"
+		elif [ -z "$OUTPUT_DIR" ]; then
+			OUTPUT_DIR="$1"
+		fi
+		shift
+		;;
 	esac
 done
 
@@ -165,4 +165,3 @@ else
 	echo "Empty report created at $OUTPUT_FILE"
 	echo "Latest copy updated at $LATEST_FILE"
 fi
-
