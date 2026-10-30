@@ -12,7 +12,7 @@ This repository contains a collection of simple, static web tools and experiment
 
 - **pages**: Standalone web applications and tools (e.g., Infinity Note).
 - **bookmarklets**: Useful JavaScript snippets that can be saved as bookmarks to enhance browser functionality (e.g., Walmart Delivery Checklist).
-- **scripts & tools**: Automation, multi-repository management, Google Jules task orchestration, and Antigravity CLI tools.
+- **scripts & tools**: Automation, multi-repository management, and Antigravity CLI tools.
 
 ## Website
 
@@ -20,7 +20,7 @@ All web tools, pages, and bookmarklets are hosted live at **[https://tbx-for-too
 
 ## Scripts & CLI Tools
 
-The root of the repository contains helper Bash scripts for workflow automation, git operations across multiple checkouts (configured in `till/repositories.txt`), Google Jules orchestration, and Antigravity CLI settings management.
+The root of the repository contains helper Bash scripts for workflow automation, git operations across multiple checkouts (configured in `till/repositories.txt`), and Antigravity CLI settings management.
 
 ### Multi-Repository & Git Management
 Operates across all checked-out repositories defined in `till/repositories.txt`:
@@ -31,13 +31,6 @@ Operates across all checked-out repositories defined in `till/repositories.txt`:
 - `tbx-coach-changes.sh`: Extracts changes from repositories and formats them (e.g., for coaching or LLM review).
 - `tbx-sort-git-files.sh`: Sorts tracked files in a git repo based on their latest commit timestamp.
 - `tbx-combine-files.sh`: Combines contents of files in a directory into a single consolidated output file.
-
-### Google Jules Automation (`tbx-jules-*`)
-Suite of REST-based tools for managing and monitoring Google Jules tasks:
-- `tbx-jules-queue.sh`: General-purpose tool to dispatch tasks to Google Jules via the REST API with automatic PR mode, plan approval toggles, dry-run previews, and quota checks.
-- `tbx-jules-quota.sh`: Monitors Jules active concurrency (slots in progress/queued vs limit) and rolling 24-hour usage with rollover countdowns.
-- `tbx-jules-status.sh`: Audits Jules sessions and pull requests across repositories to identify completed tasks without PRs, stuck/failed sessions, and open PRs pending comments.
-- `tbx-jules-clean.sh`: Scans all Jules sessions across all pages, lists failed, paused, or awaiting sessions, and confirms interactive batch deletion.
 
 ### Antigravity CLI Tooling
 Helpers for managing Antigravity CLI settings (`~/.gemini/antigravity-cli/settings.json`):
