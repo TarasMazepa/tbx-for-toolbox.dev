@@ -129,6 +129,8 @@ if [ "$dirty_count" -gt 0 ]; then
 	echo "Resolve or stash changes before pulling."
 	echo "Once changes are resolved, you can pull all repositories by running:"
 	echo "\"$SCRIPT_DIR/tbx-pull-repositories.sh\""
+	echo ""
+	echo "Completed at $(date '+%Y-%m-%d %H:%M:%S')"
 	exit 1
 else
 	echo "All $total_checked repositories are clean (no staged, unstaged, or untracked changes)."
@@ -138,5 +140,7 @@ else
 	echo ""
 	echo "To pull all repositories, run:"
 	echo "\"$SCRIPT_DIR/tbx-pull-repositories.sh\""
+	echo ""
+	echo "Completed at $(date '+%Y-%m-%d %H:%M:%S')"
 	exit 0
 fi
