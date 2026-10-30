@@ -36,3 +36,6 @@ while IFS= read -r folder || [ -n "$folder" ]; do
 done <"$REPOS_FILE"
 
 wait
+
+echo ""
+echo "Completed at $(date '+%Y-%m-%d %H:%M:%S')"

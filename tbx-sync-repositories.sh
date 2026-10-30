@@ -89,10 +89,12 @@ if [ $status_exit_code -ne 0 ]; then
 	echo ""
 	echo "Once changes are resolved, you can sync again by running:"
 	echo "\"$SCRIPT_DIR/tbx-sync-repositories.sh\""
+	echo ""
+	echo "Completed at $(date '+%Y-%m-%d %H:%M:%S')"
 	exit "$status_exit_code"
 fi
 
 # If status is blank (all clean), run pull
 echo ""
 echo "All repositories are clean. Pulling latest changes..."
-"$PULL_SCRIPT"
+exec "$PULL_SCRIPT"

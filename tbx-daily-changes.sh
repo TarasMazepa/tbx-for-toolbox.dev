@@ -166,3 +166,6 @@ else
 	echo "Latest copy updated at $LATEST_FILE"
 fi
 
+echo ""
+echo "Completed at $(date '+%Y-%m-%d %H:%M:%S')"
+

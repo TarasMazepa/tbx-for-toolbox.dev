@@ -119,3 +119,6 @@ while read -r folder || [ -n "$folder" ]; do
 done <"$REPOS_FILE"
 
 echo "Changes combined into $OUTPUT_FILE"
+
+echo ""
+echo "Completed at $(date '+%Y-%m-%d %H:%M:%S')"
