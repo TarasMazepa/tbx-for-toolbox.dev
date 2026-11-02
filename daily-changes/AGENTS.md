@@ -50,6 +50,7 @@ Include only the categories that have changes for that day:
 - **Prefix with repo**: `- **<repo-name>**: <Action verb> <description>`
 - **Active past-tense verbs**: `Added...`, `Created...`, `Implemented...`, `Refactored...`, `Published...`, `Bumped...`, `Overhauled...`.
 - **Code formatting**: Always use backticks for CLI commands, function/class names, flags, and version numbers (e.g. `mna@0.0.18`, `docker image prune --force`, `Flag`).
+- **No PR links or file paths**: Never include PR numbers/links (e.g. `(#123)`), markdown hyperlinks, or directory paths in the report; reference script or file names using plain inline code backticks only.
 - **High signal**: Keep bullets punchy, clear, and focused on value and impact.
 
 ### 4. Format & Length
