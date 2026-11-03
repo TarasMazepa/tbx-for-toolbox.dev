@@ -9,7 +9,7 @@ When the user asks for a daily summary (e.g. *"give me a daily summary"*, *"summ
 ### 1. Run the Changes Collector Script
 Run `tbx-daily-changes.sh` from the repository root (or `../tbx-daily-changes.sh` if currently inside `daily-changes/`):
 ```bash
-./tbx-daily-changes.sh [--no-fetch] [today|yesterday|YYYY-MM-DD]
+./tbx-daily-changes.sh [--no-fetch] [-o <output-dir>] [today|yesterday|YYYY-MM-DD] [output-dir]
 ```
 - **Smart branch resolution**: Automatically fetches and targets the canonical default branch (`origin/main`, `main`, `master`) across all repositories, ignoring local unmerged feature branches.
 - **Auto-fetch**: Fetches latest refs from `origin` by default before inspecting diffs (pass `--no-fetch` to skip).
@@ -18,11 +18,11 @@ Run `tbx-daily-changes.sh` from the repository root (or `../tbx-daily-changes.sh
 - Pass `yesterday` to force yesterday's commits.
 - Pass a specific date (e.g. `2026-10-18`) to gather commits for that date.
 
-The script writes to `daily-changes/generated/daily-changes-<date>.txt` and refreshes `daily-changes/generated/daily-changes-latest.txt`.
+The script writes to `<output-dir>/daily-changes-<date>.txt` and refreshes `<output-dir>/daily-changes-latest.txt` (defaulting to `daily-changes/generated/`, or redirected per `till/AGENTS.md` / `output-dir` parameter).
 
 ### 2. Read the Diffs
 Read the generated diff file:
-- `daily-changes/generated/daily-changes-latest.txt` (or the specific date file `daily-changes/generated/daily-changes-<date>.txt`).
+- `<output-dir>/daily-changes-latest.txt` (or the specific date file `<output-dir>/daily-changes-<date>.txt`).
 - Review the diffs grouped under `===== <repository> =====`.
 
 ### 3. Analyze and Summarize (Primary Style: Categorized Highlights)
@@ -57,20 +57,20 @@ Include only the categories that have changes for that day:
 - Separate categories with a single blank line.
 
 ### 5. Save Summary & Copy to Clipboard
-Write the Discord summary to `daily-changes/generated/daily-summary-latest.md` (and `daily-changes/generated/daily-summary-<date>.md`).
+Write the Discord summary to `<output-dir>/daily-summary-latest.md` (and `<output-dir>/daily-summary-<date>.md`).
 Then copy it to the clipboard:
 
 **macOS:**
 ```bash
-pbcopy < daily-changes/generated/daily-summary-latest.md
+pbcopy < <output-dir>/daily-summary-latest.md
 ```
 
 **Linux (Wayland / X11 fallback):**
 ```bash
 if command -v wl-copy >/dev/null 2>&1; then
-	wl-copy < daily-changes/generated/daily-summary-latest.md
+	wl-copy < <output-dir>/daily-summary-latest.md
 elif command -v xclip >/dev/null 2>&1; then
-	xclip -selection clipboard < daily-changes/generated/daily-summary-latest.md
+	xclip -selection clipboard < <output-dir>/daily-summary-latest.md
 fi
 ```
 

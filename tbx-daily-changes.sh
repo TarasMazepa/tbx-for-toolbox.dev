@@ -24,14 +24,19 @@ while [ $# -gt 0 ]; do
 			FETCH=true
 			shift
 			;;
+		-o|--output-dir)
+			OUTPUT_DIR="$2"
+			shift 2
+			;;
 		-h|--help)
 			echo "Usage: $(basename "$0") [OPTIONS] [today|yesterday|YYYY-MM-DD] [output-dir]"
 			echo "Gathers git diffs across all repositories listed in till/repositories.txt."
 			echo ""
 			echo "Options:"
-			echo "  --no-fetch  Skip git fetch for repositories before diffing"
-			echo "  --fetch     Fetch repositories from origin before diffing (default)"
-			echo "  -h, --help  Show this help message"
+			echo "  -o, --output-dir DIR  Directory where changes report will be written"
+			echo "  --no-fetch            Skip git fetch for repositories before diffing"
+			echo "  --fetch               Fetch repositories from origin before diffing (default)"
+			echo "  -h, --help            Show this help message"
 			echo ""
 			echo "Date Arguments:"
 			echo "  today       Gather changes for today (00:00:00 to 23:59:59)"
