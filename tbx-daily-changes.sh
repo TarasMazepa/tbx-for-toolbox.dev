@@ -92,7 +92,6 @@ EMPTY_TREE_HASH="4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 OUTPUT_DIR="${OUTPUT_DIR:-${DAILY_CHANGES_DIR:-$SCRIPT_DIR/daily-changes/generated}}"
 mkdir -p "$OUTPUT_DIR"
 OUTPUT_FILE="$OUTPUT_DIR/daily-changes-${DATE_LABEL}.txt"
-LATEST_FILE="$OUTPUT_DIR/daily-changes-latest.txt"
 
 # shellcheck disable=SC2188
 >"$OUTPUT_FILE" # Clear or create file
@@ -160,15 +159,11 @@ while read -r folder || [ -n "$folder" ]; do
 	fi
 done <"$REPOS_FILE"
 
-cp "$OUTPUT_FILE" "$LATEST_FILE"
-
 if [ -s "$OUTPUT_FILE" ]; then
 	echo "Changes combined into $OUTPUT_FILE"
-	echo "Latest copy updated at $LATEST_FILE"
 else
 	echo "No changes found for $DATE_LABEL."
 	echo "Empty report created at $OUTPUT_FILE"
-	echo "Latest copy updated at $LATEST_FILE"
 fi
 
 echo ""

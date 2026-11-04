@@ -18,11 +18,11 @@ Run `tbx-daily-changes.sh` from the repository root (or `../tbx-daily-changes.sh
 - Pass `yesterday` to force yesterday's commits.
 - Pass a specific date (e.g. `2026-10-18`) to gather commits for that date.
 
-The script writes to `<output-dir>/daily-changes-<date>.txt` and refreshes `<output-dir>/daily-changes-latest.txt` (defaulting to `daily-changes/generated/`, or redirected per `till/AGENTS.md` / `output-dir` parameter).
+The script writes to `<output-dir>/daily-changes-<date>.txt` (defaulting to `daily-changes/generated/`, or redirected per `till/AGENTS.md` / `output-dir` parameter).
 
 ### 2. Read the Diffs
 Read the generated diff file:
-- `<output-dir>/daily-changes-latest.txt` (or the specific date file `<output-dir>/daily-changes-<date>.txt`).
+- `<output-dir>/daily-changes-<date>.txt`
 - Review the diffs grouped under `===== <repository> =====`.
 
 ### 3. Analyze and Summarize (Primary Style: Categorized Highlights)
@@ -57,20 +57,20 @@ Include only the categories that have changes for that day:
 - Separate categories with a single blank line.
 
 ### 5. Save Summary & Copy to Clipboard
-Write the Discord summary to `<output-dir>/daily-summary-latest.md` (and `<output-dir>/daily-summary-<date>.md`).
+Write the Discord summary to `<output-dir>/daily-summary-<date>.md`.
 Then copy it to the clipboard:
 
 **macOS:**
 ```bash
-pbcopy < <output-dir>/daily-summary-latest.md
+pbcopy < <output-dir>/daily-summary-<date>.md
 ```
 
 **Linux (Wayland / X11 fallback):**
 ```bash
 if command -v wl-copy >/dev/null 2>&1; then
-	wl-copy < <output-dir>/daily-summary-latest.md
+	wl-copy < <output-dir>/daily-summary-<date>.md
 elif command -v xclip >/dev/null 2>&1; then
-	xclip -selection clipboard < <output-dir>/daily-summary-latest.md
+	xclip -selection clipboard < <output-dir>/daily-summary-<date>.md
 fi
 ```
 
