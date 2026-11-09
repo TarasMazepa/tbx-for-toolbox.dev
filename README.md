@@ -29,6 +29,7 @@ Operates across all checked-out repositories defined in `till/repositories.txt`:
 - `tbx-status-repositories.sh`: Scans configured repositories for uncommitted changes (staged, unstaged, untracked).
 - `tbx-pull-repositories.sh`: Automatically pulls latest changes for all configured repositories.
 - `tbx-coach-changes.sh`: Extracts changes from repositories and formats them (e.g., for coaching or LLM review).
+- `tbx-weekly-changes.sh`: Gathers weekly commit diffs across configured repositories for 7-day Sunday-to-Saturday (`[Sun - Sat]`) summaries (defaults output to `$HOME/personal/weekly-reports/diffs`).
 - `tbx-sort-git-files.sh`: Sorts tracked files in a git repo based on their latest commit timestamp.
 - `tbx-combine-files.sh`: Combines contents of files in a directory into a single consolidated output file.
 
