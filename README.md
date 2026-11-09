@@ -30,6 +30,9 @@ Operates across all checked-out repositories defined in `till/repositories.txt`:
 - `tbx-pull-repositories.sh`: Automatically pulls latest changes for all configured repositories.
 - `tbx-coach-changes.sh`: Extracts changes from repositories and formats them (e.g., for coaching or LLM review).
 - `tbx-weekly-changes.sh`: Gathers weekly commit diffs across configured repositories for 7-day Sunday-to-Saturday (`[Sun - Sat]`) summaries (defaults output to `$HOME/personal/weekly-reports/diffs`).
+- `tbx-gh-prs.sh`: Fast parallel audit of open pull requests across all configured repositories, distinguishing drafts from ready-to-merge PRs.
+- `tbx-gh-actions.sh`: Fast parallel audit of GitHub Actions workflow runs across all configured repositories, flagging broken CI and failing scheduled crons.
+- `tbx-gh-status.sh`: Unified GitHub health audit running both PR and Actions workflow status checks in a single dashboard command.
 - `tbx-sort-git-files.sh`: Sorts tracked files in a git repo based on their latest commit timestamp.
 - `tbx-combine-files.sh`: Combines contents of files in a directory into a single consolidated output file.
 

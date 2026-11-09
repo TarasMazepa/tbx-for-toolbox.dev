@@ -29,3 +29,9 @@ When asked for a coaching update, coaching summary, or progress report:
 3. Save the formatted summary to the target directory or destination specified in `till/AGENTS.md`.
 4. Copy the summary to the system clipboard: `pbcopy < <summary-file>`.
 5. Output the summary in your response and confirm that it has been copied to the clipboard.
+
+## GitHub Health & Actions Audit Workflow
+When performing a morning routine health check, reviewing active PRs, or auditing CI pipelines:
+1. Run `./tbx-gh-prs.sh` to audit open pull requests across all repositories in `till/repositories.txt` (distinguishing Drafts vs. Ready to review/merge). Pass `-r` or `--ready` to focus on merge-ready PRs.
+2. Run `./tbx-gh-actions.sh` to audit failing GitHub Actions workflow runs and broken cron jobs across all repositories.
+3. Or run `./tbx-gh-status.sh` to get the unified dashboard report covering both PRs and workflow health in a single command.
