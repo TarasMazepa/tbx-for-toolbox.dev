@@ -34,7 +34,7 @@ Options:
 
 Examples:
   $(basename "$0")
-  $(basename "$0") --repo ai-todo
+  $(basename "$0") --repo hivebud
 EOF
 	exit 0
 }
