@@ -2,6 +2,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPOS_FILE="$SCRIPT_DIR/till/repositories.txt"
+EXCLUDES_FILE="$SCRIPT_DIR/till/diff-excludes.txt"
 
 if [ ! -f "$REPOS_FILE" ]; then
 	echo "Error: $REPOS_FILE does not exist. It needs to be created."
@@ -183,8 +184,17 @@ TOTAL_REPOS=0
 REPOS_WITH_CHANGES=0
 
 while read -r folder || [ -n "$folder" ]; do
+	# Trim leading/trailing whitespace
+	folder="$(echo "${folder}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+
 	# Skip empty lines and comments
 	if [[ -z "$folder" || "$folder" == \#* ]]; then
+		continue
+	fi
+
+	# Check repository blocklist / ignore
+	if [ -f "$EXCLUDES_FILE" ] && grep -E "^[[:space:]]*${folder}[[:space:]]*:[[:space:]]*\*" "$EXCLUDES_FILE" >/dev/null 2>&1; then
+		echo "Skipping $folder (blocklisted in $(basename "$EXCLUDES_FILE"))..."
 		continue
 	fi
 
@@ -192,6 +202,21 @@ while read -r folder || [ -n "$folder" ]; do
 	TOTAL_REPOS=$((TOTAL_REPOS + 1))
 
 	if [ -d "$target_dir" ]; then
+		# Extract path excludes for this repo
+		PATH_EXCLUDES=()
+		if [ -f "$EXCLUDES_FILE" ]; then
+			while IFS= read -r pat || [ -n "$pat" ]; do
+				[ -n "$pat" ] && PATH_EXCLUDES+=(":(exclude)$pat")
+			done < <(awk -F':' -v repo="$folder" '
+				$1 ~ "^[[:space:]]*" repo "[[:space:]]*$" {
+					sub(/^[[:space:]]*/, "", $2)
+					sub(/[[:space:]]*$/, "", $2)
+					if ($2 != "*") print $2
+				}
+			' "$EXCLUDES_FILE")
+		fi
+
+		STATUS=0
 		(
 			cd "$target_dir" || exit 1
 			if [ -d ".git" ]; then
@@ -211,11 +236,15 @@ while read -r folder || [ -n "$folder" ]; do
 					TARGET_REF="HEAD"
 				fi
 
-				START_COMMIT=$(git rev-list -1 --before="$START_DATE" "$TARGET_REF" 2>/dev/null)
-				END_COMMIT=$(git rev-list -1 --before="$END_DATE" "$TARGET_REF" 2>/dev/null)
+				START_COMMIT=$(git rev-list -1 --before="$START_DATE" "$TARGET_REF" 2>/dev/null || true)
+				END_COMMIT=$(git rev-list -1 --before="$END_DATE" "$TARGET_REF" 2>/dev/null || true)
 
 				if [ -n "$START_COMMIT" ] && [ -n "$END_COMMIT" ] && [ "$START_COMMIT" != "$END_COMMIT" ]; then
-					CHANGES=$(git diff "$START_COMMIT" "$END_COMMIT")
+					if [ "${#PATH_EXCLUDES[@]}" -gt 0 ]; then
+						CHANGES=$(git diff "$START_COMMIT" "$END_COMMIT" -- . "${PATH_EXCLUDES[@]}")
+					else
+						CHANGES=$(git diff "$START_COMMIT" "$END_COMMIT")
+					fi
 					if [ -n "$CHANGES" ]; then
 						{
 							echo "===== $folder ====="
@@ -225,7 +254,11 @@ while read -r folder || [ -n "$folder" ]; do
 						exit 2 # Signal changes found
 					fi
 				elif [ -z "$START_COMMIT" ] && [ -n "$END_COMMIT" ]; then
-					CHANGES=$(git diff "$EMPTY_TREE_HASH" "$END_COMMIT")
+					if [ "${#PATH_EXCLUDES[@]}" -gt 0 ]; then
+						CHANGES=$(git diff "$EMPTY_TREE_HASH" "$END_COMMIT" -- . "${PATH_EXCLUDES[@]}")
+					else
+						CHANGES=$(git diff "$EMPTY_TREE_HASH" "$END_COMMIT")
+					fi
 					if [ -n "$CHANGES" ]; then
 						{
 							echo "===== $folder ====="
@@ -236,8 +269,7 @@ while read -r folder || [ -n "$folder" ]; do
 					fi
 				fi
 			fi
-		)
-		STATUS=$?
+		) || STATUS=$?
 		if [ "$STATUS" -eq 2 ]; then
 			REPOS_WITH_CHANGES=$((REPOS_WITH_CHANGES + 1))
 		fi

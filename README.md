@@ -24,11 +24,11 @@ The root of the repository contains helper Bash scripts for workflow automation,
 
 ### Multi-Repository & Git Management
 Operates across all checked-out repositories defined in `till/repositories.txt`:
-- `tbx-daily-changes.sh`: Gathers daily commit diffs across configured repositories into `daily-changes/generated/` with smart time defaults, date selection, origin auto-fetching, and canonical branch targeting (`origin/main`, `main`, etc.). Follows `daily-changes/AGENTS.md` for Discord summary generation.
+- `tbx-daily-changes.sh`: Gathers daily commit manifests and git diffs across configured repositories into `daily-changes/generated/` with smart time defaults, date selection, origin auto-fetching, blocklist support (`till/diff-excludes.txt`), and canonical branch targeting. Follows `daily-changes/AGENTS.md` for Discord summary generation.
 - `tbx-sync-repositories.sh`: Audits status across configured repositories and automatically pulls updates for all clean repositories.
 - `tbx-status-repositories.sh`: Scans configured repositories for uncommitted changes (staged, unstaged, untracked).
 - `tbx-pull-repositories.sh`: Automatically pulls latest changes for all configured repositories.
-- `tbx-coach-changes.sh`: Extracts changes from repositories and formats them (e.g., for coaching or LLM review).
+- `tbx-coach-changes.sh`: Extracts changes and commit logs from repositories and formats them (supporting `till/diff-excludes.txt` for clean diffs).
 - `tbx-weekly-changes.sh`: Gathers weekly commit diffs across configured repositories for 7-day Sunday-to-Saturday (`[Sun - Sat]`) summaries (defaults output to `$HOME/personal/weekly-reports/diffs`).
 - `tbx-gh-prs.sh`: Fast parallel audit of open pull requests across all configured repositories, distinguishing drafts from ready-to-merge PRs.
 - `tbx-gh-actions.sh`: Fast parallel audit of GitHub Actions workflow runs across all configured repositories, flagging broken CI and failing scheduled crons.
