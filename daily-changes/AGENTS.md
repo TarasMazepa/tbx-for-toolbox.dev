@@ -113,7 +113,7 @@ Created Stax Workflows Guide and integrated it into the web documentation.
 Refactored internal commands and context to support asynchronous execution for Git operations.
 Migrated file I/O retry logic to monolib_dart.
 
-🤖 ai-todo
+🤖 hivebud
 Converted CLI and prompt setup to asynchronous execution.
 Refactored item processing to use asynchronous JSONL encoding.
 Bumped monolib_dart dependency to 0.0.12.
@@ -128,7 +128,7 @@ Implemented jsonlEncodeAsync for non-blocking JSONL output.
 ```text
 🚀 Dev Update | Wednesday, April 1, 2026
 
-🤖 ai-todo
+🤖 hivebud
 Implemented Batcher for optimized asynchronous logging and tracing.
 Bumped monolib_dart dependency to 0.0.17.
 
