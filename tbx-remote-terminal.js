@@ -67,7 +67,7 @@ const KEY_CODES = {
 const sseClients = new Set();
 let lastStateJson = '';
 let lastStateHash = '';
-let lastKnownGoodState = [];
+let lastKnownGoodState = { windows: [], displays: [] };
 
 /**
  * Detect Antigravity CLI state from window name, terminal buffer text, and terminal column width.
@@ -160,11 +160,28 @@ function detectAgyState(windowName, analysisText, cols) {
   return { status: 'idle', label: 'IDLE', color: 'gray', actionRequired: false };
 }
 
-// Atomic Batch JXA Script to query Terminal.app windows, geometry, and preview
+// Atomic Batch JXA Script to query physical displays, Terminal.app windows, geometry, and preview
 const JXA_FETCH_SCRIPT = `
 (() => {
+  // 1. Fetch physical display geometry via NSScreen
+  const displays = [];
+  try {
+    ObjC.import("AppKit");
+    const screens = $.NSScreen.screens;
+    const primaryHeight = screens.objectAtIndex(0).frame.size.height;
+    for (let i = 0; i < screens.count; i++) {
+      const f = screens.objectAtIndex(i).frame;
+      displays.push({
+        x: Math.round(f.origin.x),
+        y: Math.round(primaryHeight - (f.origin.y + f.size.height)),
+        width: Math.round(f.size.width),
+        height: Math.round(f.size.height)
+      });
+    }
+  } catch(e) {}
+
   const terminal = Application("Terminal");
-  if (!terminal.running()) return JSON.stringify([]);
+  if (!terminal.running()) return JSON.stringify({ windows: [], displays: displays });
   
   const wins = terminal.windows;
   let ids = [], names = [], positions = [], sizes = [], indices = [];
@@ -175,16 +192,48 @@ const JXA_FETCH_SCRIPT = `
     sizes = wins.size();
     indices = wins.index();
   } catch(e) {
-    return JSON.stringify([]);
+    return JSON.stringify({ windows: [], displays: displays });
   }
   
-  if (!ids || !ids.length) return JSON.stringify([]);
+  if (!ids || !ids.length) return JSON.stringify({ windows: [], displays: displays });
+
+  // 2. Query System Events for true global desktop coordinates across multi-monitor setups.
+  // Note: Terminal.app's internal AppleScript dictionary has an upstream bug where positions[i].y
+  // is clamped to the local screen menu bar offset (y ≈ 30-33) instead of global desktop Y.
+  let sysPositions = [], sysSizes = [], sysNames = [];
+  try {
+    const sys = Application("System Events");
+    const termProc = sys.processes.byName("Terminal");
+    if (termProc.exists()) {
+      sysNames = termProc.windows.name();
+      sysPositions = termProc.windows.position();
+      sysSizes = termProc.windows.size();
+    }
+  } catch(e) {}
   
   const results = [];
   for (let i = 0; i < ids.length; i++) {
     const id = ids[i];
     const name = names[i];
     if (!id || !name) continue;
+
+    let posX = Math.round(positions[i].x);
+    let posY = Math.round(positions[i].y);
+    let sizeW = Math.round(sizes[i].x);
+    let sizeH = Math.round(sizes[i].y);
+
+    if (sysNames && sysNames.length) {
+      let sysIdx = sysNames.indexOf(name);
+      if (sysIdx === -1 && i < sysPositions.length) sysIdx = i;
+      if (sysIdx >= 0 && sysPositions[sysIdx] && Array.isArray(sysPositions[sysIdx])) {
+        posX = Math.round(sysPositions[sysIdx][0]);
+        posY = Math.round(sysPositions[sysIdx][1]);
+      }
+      if (sysIdx >= 0 && sysSizes[sysIdx] && Array.isArray(sysSizes[sysIdx])) {
+        sizeW = Math.round(sysSizes[sysIdx][0]);
+        sizeH = Math.round(sysSizes[sysIdx][1]);
+      }
+    }
     
     let preview = "";
     let analysis = "";
@@ -244,8 +293,8 @@ const JXA_FETCH_SCRIPT = `
       id: id,
       name: name,
       index: indices[i],
-      position: { x: Math.round(positions[i].x), y: Math.round(positions[i].y) },
-      size: { width: Math.round(sizes[i].x), height: Math.round(sizes[i].y) },
+      position: { x: posX, y: posY },
+      size: { width: sizeW, height: sizeH },
       cols: cols,
       rows: rows,
       tty: tty,
@@ -254,12 +303,12 @@ const JXA_FETCH_SCRIPT = `
       analysis: analysis
     });
   }
-  return JSON.stringify(results);
+  return JSON.stringify({ windows: results, displays: displays });
 })()
 `.trim();
 
 /**
- * Query current Terminal.app window state (with fallback to last known good state on blip)
+ * Query current Terminal.app window and multi-monitor display state
  */
 function fetchTerminalState() {
   try {
@@ -269,8 +318,11 @@ function fetchTerminalState() {
       timeout: 2500
     });
     const parsed = JSON.parse(raw.trim());
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      const enriched = parsed.map(w => {
+    const rawWindows = Array.isArray(parsed) ? parsed : (parsed && parsed.windows ? parsed.windows : []);
+    const displays = Array.isArray(parsed) ? [] : (parsed && parsed.displays ? parsed.displays : []);
+
+    if (Array.isArray(rawWindows) && rawWindows.length > 0) {
+      const enriched = rawWindows.map(w => {
         const agyState = detectAgyState(w.name, w.analysis || w.preview, w.cols);
         return {
           id: w.id,
@@ -286,12 +338,13 @@ function fetchTerminalState() {
           agyState: agyState
         };
       });
-      lastKnownGoodState = enriched;
-      return enriched;
+      const state = { windows: enriched, displays: displays };
+      lastKnownGoodState = state;
+      return state;
     }
-    return lastKnownGoodState.length ? lastKnownGoodState : [];
+    return lastKnownGoodState && lastKnownGoodState.windows && lastKnownGoodState.windows.length ? lastKnownGoodState : { windows: [], displays: displays };
   } catch (err) {
-    return lastKnownGoodState;
+    return lastKnownGoodState && lastKnownGoodState.windows ? lastKnownGoodState : { windows: [], displays: [] };
   }
 }
 
@@ -374,7 +427,8 @@ function injectKey(windowId, key) {
 /**
  * Compute SHA-256 hash of window state without self-feedback loop
  */
-function computeStateHash(windows) {
+function computeStateHash(state) {
+  const windows = Array.isArray(state) ? state : (state && state.windows ? state.windows : []);
   const normalized = windows.map(w => ({
     id: w.id,
     name: w.name,
@@ -609,6 +663,32 @@ const HTML_APP = `<!DOCTYPE html>
       overflow: hidden;
     }
 
+    /* Multi-Monitor Background Guides */
+    .monitors-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .monitor-panel {
+      position: absolute;
+      border: 1px dashed rgba(56, 189, 248, 0.25);
+      border-radius: 8px;
+      box-sizing: border-box;
+      pointer-events: none;
+      background: rgba(12, 20, 39, 0.2);
+    }
+    .monitor-label {
+      position: absolute;
+      top: 6px;
+      left: 8px;
+      font-size: 0.62rem;
+      font-weight: 800;
+      color: rgba(148, 163, 184, 0.4);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
     /* Individual Spatial Terminal Window Box */
     .spatial-window {
       position: absolute;
@@ -617,6 +697,7 @@ const HTML_APP = `<!DOCTYPE html>
                   top 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
                   width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
                   height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+      z-index: 10;
     }
     .window-card {
       width: 100%;
@@ -727,8 +808,8 @@ const HTML_APP = `<!DOCTYPE html>
       overflow: hidden;
       white-space: pre-wrap;
       word-break: break-all;
-      flex: 1;
-      min-height: 40px;
+      flex: 1 1 0;
+      min-height: 20px;
       display: flex;
       flex-direction: column;
       justify-content: flex-end;
@@ -790,10 +871,10 @@ const HTML_APP = `<!DOCTYPE html>
       transition: transform 0.08s, background 0.1s, box-shadow 0.2s;
       outline: none;
       font-weight: 700;
-      padding: 10px 4px;
-      font-size: clamp(0.85rem, 1.8vw, 1.15rem);
+      padding: clamp(6px, 1vh, 10px) 4px;
+      font-size: clamp(0.72rem, 1.5vw, 1.15rem);
       flex: 1;
-      min-height: 42px;
+      min-height: clamp(32px, 4vh, 42px);
     }
     button:active {
       transform: scale(0.93);
@@ -803,10 +884,10 @@ const HTML_APP = `<!DOCTYPE html>
     /* Button Colors */
     button.btn-enter {
       background: var(--enter-btn);
-      font-size: clamp(0.95rem, 2.1vw, 1.3rem);
+      font-size: clamp(0.85rem, 1.8vw, 1.3rem);
       font-weight: 800;
       flex: 1.8;
-      min-height: 44px;
+      min-height: clamp(34px, 4.2vh, 44px);
     }
     button.btn-enter:active {
       background: var(--enter-btn-active);
@@ -880,6 +961,7 @@ const HTML_APP = `<!DOCTYPE html>
 
   <script>
     let currentWindows = [];
+    let currentDisplays = [];
     let isActionInProgress = false;
     const statusDot = document.getElementById('statusDot');
     const statusText = document.getElementById('statusText');
@@ -981,7 +1063,7 @@ const HTML_APP = `<!DOCTYPE html>
     }
 
     // Render Full Spatial Desktop Layout with Ambient Lighting (Muted vs Lit)
-    function renderSpatialLayout(windows) {
+    function renderSpatialLayout(windows, displays = []) {
       windowCount.textContent = windows.length + ' window' + (windows.length === 1 ? '' : 's');
       if (!windows.length) {
         spatialStage.innerHTML = '<div class="empty-state">No open Terminal.app windows found</div>';
@@ -992,8 +1074,16 @@ const HTML_APP = `<!DOCTYPE html>
       const emptyState = spatialStage.querySelector('.empty-state');
       if (emptyState) emptyState.remove();
 
-      // Compute global desktop bounding box
+      // Compute global desktop bounding box from physical displays (if available) and windows
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      if (displays && displays.length > 0) {
+        displays.forEach(d => {
+          minX = Math.min(minX, d.x);
+          minY = Math.min(minY, d.y);
+          maxX = Math.max(maxX, d.x + d.width);
+          maxY = Math.max(maxY, d.y + d.height);
+        });
+      }
       windows.forEach(w => {
         minX = Math.min(minX, w.position.x);
         minY = Math.min(minY, w.position.y);
@@ -1025,6 +1115,32 @@ const HTML_APP = `<!DOCTYPE html>
 
       spatialStage.style.width = Math.round(stageW) + 'px';
       spatialStage.style.height = Math.round(stageH) + 'px';
+
+      // Render monitor outline layer behind windows when multiple displays exist
+      let monitorsLayer = spatialStage.querySelector('.monitors-layer');
+      if (!monitorsLayer) {
+        monitorsLayer = document.createElement('div');
+        monitorsLayer.className = 'monitors-layer';
+        spatialStage.prepend(monitorsLayer);
+      }
+      monitorsLayer.innerHTML = '';
+      if (displays && displays.length > 1) {
+        displays.forEach((d, idx) => {
+          const mLeft = ((d.x - minX) / spanX) * 100;
+          const mTop = ((d.y - minY) / spanY) * 100;
+          const mWidth = (d.width / spanX) * 100;
+          const mHeight = (d.height / spanY) * 100;
+
+          const panel = document.createElement('div');
+          panel.className = 'monitor-panel';
+          panel.style.left = mLeft + '%';
+          panel.style.top = mTop + '%';
+          panel.style.width = mWidth + '%';
+          panel.style.height = mHeight + '%';
+          panel.innerHTML = '<span class="monitor-label">Display ' + (idx + 1) + '</span>';
+          monitorsLayer.appendChild(panel);
+        });
+      }
 
       // Index existing DOM cards by window ID
       const existingCards = new Map();
@@ -1144,7 +1260,7 @@ const HTML_APP = `<!DOCTYPE html>
 
     // Re-render on resize, orientation change, or fold/unfold
     function handleResize() {
-      if (currentWindows.length) renderSpatialLayout(currentWindows);
+      if (currentWindows.length) renderSpatialLayout(currentWindows, currentDisplays);
     }
     window.addEventListener('resize', handleResize);
     if (window.visualViewport) {
@@ -1162,8 +1278,10 @@ const HTML_APP = `<!DOCTYPE html>
 
       evtSource.onmessage = (event) => {
         try {
-          currentWindows = JSON.parse(event.data);
-          renderSpatialLayout(currentWindows);
+          const data = JSON.parse(event.data);
+          currentWindows = Array.isArray(data) ? data : (data && data.windows ? data.windows : []);
+          currentDisplays = Array.isArray(data) ? [] : (data && data.displays ? data.displays : []);
+          renderSpatialLayout(currentWindows, currentDisplays);
           checkAutoAccept(currentWindows);
         } catch (e) {
           console.error('Error parsing SSE data', e);
@@ -1278,7 +1396,8 @@ const checkTimer = setInterval(() => {
     lastStateJson = JSON.stringify(current);
 
     if (sseClients.size > 0) {
-      console.log(`[⚡] Window update detected (${current.length} window(s)) -> Broadcasting to ${sseClients.size} client(s)`);
+      const winCount = current.windows ? current.windows.length : (Array.isArray(current) ? current.length : 0);
+      console.log(`[⚡] Window update detected (${winCount} window(s)) -> Broadcasting to ${sseClients.size} client(s)`);
       broadcast(lastStateJson);
     }
   }
