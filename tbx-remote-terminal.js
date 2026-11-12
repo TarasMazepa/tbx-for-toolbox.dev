@@ -25,6 +25,7 @@ const os = require('os');
 const { execFileSync } = require('child_process');
 const crypto = require('crypto');
 
+
 let qrGenerator = null;
 try {
   qrGenerator = require('./tbx-qr-terminal.js');
@@ -46,6 +47,10 @@ function printQrCode(url) {
 
 const PORT = parseInt(process.env.PORT || '8999', 10);
 const POLL_INTERVAL_MS = 600;
+
+// Embedded minimal seamless looping MP4 video to prevent mobile screen sleep over LAN HTTP
+const NO_SLEEP_MP4_BASE64 = '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';
+const NO_SLEEP_MP4_BUF = Buffer.from(NO_SLEEP_MP4_BASE64, 'base64');
 
 // Key code mapping for macOS System Events
 const KEY_CODES = {
@@ -820,30 +825,19 @@ const HTML_APP = `<!DOCTYPE html>
       color: #fef08a;
     }
 
-    /* BUTTON PAD: MUTED BY DEFAULT, LIGHTS UP WHEN ACTION IS REQUIRED! */
+    /* BUTTON PAD: CRISP, VIBRANT & READABLE AT ALL TIMES */
     .button-pad {
       display: flex;
       flex-direction: column;
       gap: 6px;
       margin-top: auto;
       flex-shrink: 0;
-      transition: opacity 0.3s ease, filter 0.3s ease;
+      opacity: 0.95;
+      transition: opacity 0.2s ease, filter 0.2s ease;
     }
 
-    /* Muted State (when no action is required) */
-    .spatial-window:not(.action-required) .button-pad {
-      opacity: 0.35;
-      filter: grayscale(85%);
-    }
-    .spatial-window:not(.action-required).active .button-pad {
-      opacity: 0.72;
-      filter: grayscale(25%);
-    }
-    /* Quick interaction on hover/touch keeps buttons responsive */
-    .spatial-window:not(.action-required):hover .button-pad,
-    .spatial-window:not(.action-required):active .button-pad {
-      opacity: 0.85;
-      filter: none;
+    .spatial-window.active .button-pad {
+      opacity: 1;
     }
 
     /* LIT UP State (when action IS required - full colorful & vibrant!) */
@@ -945,6 +939,10 @@ const HTML_APP = `<!DOCTYPE html>
         <input type="checkbox" id="autoAcceptToggle">
         <span class="auto-accept-switch"></span>
       </label>
+      <div class="status-badge" id="wakeLockBadge" title="Screen Wake Lock status (prevents screen dimming)">
+        <div class="status-dot online" id="wakeDot"></div>
+        <span id="wakeText">Awake</span>
+      </div>
       <div class="status-badge">
         <div class="status-dot" id="statusDot"></div>
         <span id="statusText">Connecting</span>
@@ -1019,19 +1017,120 @@ const HTML_APP = `<!DOCTYPE html>
       });
     }
 
-    // Haptics & Screen Wake Lock
+    // Haptics Helper
     function triggerHaptic(duration = 15) {
       if (navigator.vibrate) {
         try { navigator.vibrate(duration); } catch(e) {}
       }
     }
 
-    async function requestWakeLock() {
-      if ('wakeLock' in navigator) {
-        try { await navigator.wakeLock.request('screen'); } catch (err) {}
+    // Robust Keep-Awake Engine (Screen Wake Lock API + NoSleep HTML5 Media Loop)
+    let wakeLockSentinel = null;
+    let isVideoAwakePlaying = false;
+    const wakeDot = document.getElementById('wakeDot');
+    const wakeText = document.getElementById('wakeText');
+    const wakeBadge = document.getElementById('wakeLockBadge');
+
+    // Create invisible looping video element
+    const noSleepVideo = document.createElement('video');
+    noSleepVideo.setAttribute('title', 'NoSleep');
+    noSleepVideo.setAttribute('playsinline', '');
+    noSleepVideo.setAttribute('webkit-playsinline', '');
+    noSleepVideo.setAttribute('muted', '');
+    noSleepVideo.muted = true;
+    noSleepVideo.loop = true;
+    noSleepVideo.style.position = 'fixed';
+    noSleepVideo.style.width = '1px';
+    noSleepVideo.style.height = '1px';
+    noSleepVideo.style.opacity = '0.001';
+    noSleepVideo.style.pointerEvents = 'none';
+    noSleepVideo.style.bottom = '0';
+    noSleepVideo.style.right = '0';
+
+    const videoSource = document.createElement('source');
+    videoSource.src = '/nosleep.mp4';
+    videoSource.type = 'video/mp4';
+    noSleepVideo.appendChild(videoSource);
+    document.body.appendChild(noSleepVideo);
+
+    // iOS Safari continuous loop enforcement
+    noSleepVideo.addEventListener('timeupdate', () => {
+      if (noSleepVideo.currentTime > 0.5) {
+        noSleepVideo.currentTime = Math.random() * 0.3;
+      }
+    });
+
+    function updateWakeLockUI() {
+      if (!wakeDot || !wakeText) return;
+      const isActive = !!wakeLockSentinel || isVideoAwakePlaying;
+      if (isActive) {
+        wakeDot.className = 'status-dot online';
+        wakeText.textContent = 'Awake';
+        if (wakeBadge) wakeBadge.title = 'Screen Keep-Awake active (screen will not go dark)';
+      } else {
+        wakeDot.className = 'status-dot';
+        wakeText.textContent = 'Tap for Awake';
+        if (wakeBadge) wakeBadge.title = 'Screen Keep-Awake inactive. Tap anywhere or tap this badge.';
       }
     }
-    document.addEventListener('click', requestWakeLock, { once: true });
+
+    async function enableKeepAwake() {
+      // 1. Try native Screen Wake Lock API (works on HTTPS / localhost)
+      if ('wakeLock' in navigator) {
+        try {
+          if (!wakeLockSentinel || wakeLockSentinel.released) {
+            wakeLockSentinel = await navigator.wakeLock.request('screen');
+            wakeLockSentinel.addEventListener('release', () => {
+              wakeLockSentinel = null;
+              updateWakeLockUI();
+              if (document.visibilityState === 'visible') {
+                setTimeout(enableKeepAwake, 600);
+              }
+            });
+          }
+        } catch(e) {}
+      }
+
+      // 2. Play HTML5 Keep-Awake video (works over HTTP LAN on iOS Safari & Android)
+      try {
+        if (noSleepVideo.paused) {
+          const p = noSleepVideo.play();
+          if (p && typeof p.then === 'function') {
+            await p;
+          }
+        }
+        isVideoAwakePlaying = true;
+      } catch(e) {
+        isVideoAwakePlaying = !noSleepVideo.paused;
+      }
+
+      updateWakeLockUI();
+    }
+
+    // Try immediately on script run
+    enableKeepAwake();
+
+    // Re-arm on visibilitychange (e.g. phone wake up or switching back to browser)
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        enableKeepAwake();
+      }
+    });
+
+    // Re-arm on any user touch/tap anywhere on the screen
+    ['click', 'touchstart', 'touchend', 'pointerdown'].forEach(evtType => {
+      document.addEventListener(evtType, () => {
+        enableKeepAwake();
+      }, { passive: true });
+    });
+
+    if (wakeBadge) {
+      wakeBadge.style.cursor = 'pointer';
+      wakeBadge.addEventListener('click', () => {
+        triggerHaptic(20);
+        enableKeepAwake();
+      });
+    }
 
     // HTML Escape Helper
     function escapeHtml(str) {
@@ -1274,6 +1373,7 @@ const HTML_APP = `<!DOCTYPE html>
       evtSource.onopen = () => {
         statusDot.className = 'status-dot online';
         statusText.textContent = 'Live';
+        enableKeepAwake();
       };
 
       evtSource.onmessage = (event) => {
@@ -1321,6 +1421,22 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === '/' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(HTML_APP);
+    return;
+  }
+
+  // Endpoint: GET /nosleep.mp4 (Minimal seamless looping video to keep mobile screens awake over LAN HTTP)
+  if (url.pathname === '/nosleep.mp4' && (req.method === 'GET' || req.method === 'HEAD')) {
+    res.writeHead(200, {
+      'Content-Type': 'video/mp4',
+      'Content-Length': NO_SLEEP_MP4_BUF.length,
+      'Accept-Ranges': 'bytes',
+      'Cache-Control': 'public, max-age=86400'
+    });
+    if (req.method === 'HEAD') {
+      res.end();
+    } else {
+      res.end(NO_SLEEP_MP4_BUF);
+    }
     return;
   }
 
@@ -1428,6 +1544,9 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`mDNS Link:        http://${hostname}:${PORT}`);
   console.log(`\nScan with Phone Camera to Open Spatial Controller:`);
   printQrCode(phoneUrl);
+  console.log(`======================================================`);
+  console.log(`Keep-Awake:`);
+  console.log(`  • Web Controller: Screen Wake Lock API + Auto Re-arm Active`);
   console.log(`======================================================`);
   console.log(`Endpoints:`);
   console.log(`  • GET  /          -> 100% Spatial Multi-Monitor Controller`);
