@@ -12,6 +12,14 @@ Exploratory scratchpad for backlog ideas, investigative spikes, architectural in
 
 ## Resolved Architectural Decisions
 
+- [x] **2. Multi-Monitor True Y-Coordinate Layout Detection in Remote Terminal**
+  - **Status**: Implemented in [`tbx-remote-terminal.js`](tbx-remote-terminal.js).
+  - **Resolution**:
+    1. **Root Cause Analysis**: Fixed an upstream macOS `Terminal.app` AppleScript bug where `terminal.windows.position()` clamped/moduloed the Y coordinate to the local screen menu bar offset (`y ≈ 30–33`), discarding global multi-monitor vertical offsets and collapsing 2×2 multi-monitor grids into a single overlapping row.
+    2. **True Coordinate Resolution**: Augmented the atomic batch JXA script (`JXA_FETCH_SCRIPT`) to query `System Events` (`sys.processes.byName("Terminal").windows.position()`), which reliably returns global desktop coordinates across multi-monitor layouts matching windows by name and index.
+    3. **Physical Display Geometry**: Integrated `NSScreen.screens` to extract physical monitor boundaries, allowing the spatial viewport to anchor the global desktop bounding box cleanly and render subtle monitor boundary guidelines behind window cards.
+    4. **Responsive Card Scaling**: Updated preview buffers and button pad dimensions with CSS `clamp(...)` and `flex: 1 1 0` so 4-monitor 2×2 grids scale smoothly without vertical container overflow on mobile displays.
+
 - [x] **1. Remote Terminal Controller & Virtual Macro-Keyboard for macOS Terminal**
   - **Status**: Implemented in [`tbx-remote-terminal.js`](tbx-remote-terminal.js).
   - **Resolution**:
