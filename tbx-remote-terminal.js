@@ -25,6 +25,25 @@ const os = require('os');
 const { execFileSync } = require('child_process');
 const crypto = require('crypto');
 
+let qrGenerator = null;
+try {
+  qrGenerator = require('./tbx-qr-terminal.js');
+} catch (e) {}
+
+/**
+ * Print compact ASCII QR code to terminal stdout
+ */
+function printQrCode(url) {
+  if (qrGenerator && typeof qrGenerator.generate === 'function') {
+    try {
+      qrGenerator.generate(url, { small: true }, ascii => {
+        console.log(ascii);
+      });
+      return;
+    } catch (e) {}
+  }
+}
+
 const PORT = parseInt(process.env.PORT || '8999', 10);
 const POLL_INTERVAL_MS = 600;
 
@@ -511,6 +530,62 @@ const HTML_APP = `<!DOCTYPE html>
       box-shadow: 0 0 6px #22c55e;
     }
 
+    /* Auto-Accept Toggle Switch */
+    .auto-accept-container {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      padding: 3px 8px;
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 9999px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .auto-accept-container:has(input:checked) {
+      border-color: #f59e0b;
+      background: #1c1808;
+    }
+    .auto-accept-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #94a3b8;
+    }
+    .auto-accept-container:has(input:checked) .auto-accept-label {
+      color: #fbbf24;
+    }
+    .auto-accept-container input {
+      display: none;
+    }
+    .auto-accept-switch {
+      position: relative;
+      width: 28px;
+      height: 16px;
+      background: #334155;
+      border-radius: 9999px;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+    .auto-accept-switch::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 12px;
+      height: 12px;
+      background: #ffffff;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+    .auto-accept-container input:checked + .auto-accept-switch {
+      background: #f59e0b;
+    }
+    .auto-accept-container input:checked + .auto-accept-switch::after {
+      transform: translateX(12px);
+    }
+
     /* Spatial Viewport */
     .viewport-container {
       flex: 1 1 0;
@@ -784,6 +859,11 @@ const HTML_APP = `<!DOCTYPE html>
       <h1>Terminal Spatial Remote</h1>
     </div>
     <div class="header-info">
+      <label class="auto-accept-container" title="Automatically dispatch Enter when an action is required">
+        <span class="auto-accept-label">Auto-Accept</span>
+        <input type="checkbox" id="autoAcceptToggle">
+        <span class="auto-accept-switch"></span>
+      </label>
       <div class="status-badge">
         <div class="status-dot" id="statusDot"></div>
         <span id="statusText">Connecting</span>
@@ -806,6 +886,56 @@ const HTML_APP = `<!DOCTYPE html>
     const windowCount = document.getElementById('windowCount');
     const viewportContainer = document.getElementById('viewportContainer');
     const spatialStage = document.getElementById('spatialStage');
+    const autoAcceptToggle = document.getElementById('autoAcceptToggle');
+
+    // Auto-Accept toggle and execution state
+    let autoAcceptEnabled = localStorage.getItem('tbx_auto_accept') === 'true';
+    const activeAutoAccepts = new Set();
+
+    if (autoAcceptToggle) {
+      autoAcceptToggle.checked = autoAcceptEnabled;
+      autoAcceptToggle.addEventListener('change', () => {
+        autoAcceptEnabled = autoAcceptToggle.checked;
+        localStorage.setItem('tbx_auto_accept', autoAcceptEnabled ? 'true' : 'false');
+        triggerHaptic(30);
+        if (!autoAcceptEnabled) {
+          activeAutoAccepts.clear();
+        } else if (currentWindows.length) {
+          checkAutoAccept(currentWindows);
+        }
+      });
+    }
+
+    function checkAutoAccept(windows) {
+      if (!autoAcceptEnabled) return;
+
+      windows.forEach(w => {
+        const isActionRequired = w.agyState && w.agyState.actionRequired;
+        if (isActionRequired) {
+          if (!activeAutoAccepts.has(w.id)) {
+            activeAutoAccepts.add(w.id);
+            console.log('[⚡ Auto-Accept] Action required on window ' + w.id + ' (' + w.name + '). Scheduling Enter...');
+
+            // Flash visual status on the button
+            const card = document.querySelector('.spatial-window[data-id="' + w.id + '"]');
+            const enterBtn = card ? card.querySelector('.btn-enter') : null;
+            if (enterBtn) {
+              enterBtn.textContent = '⚡ ACCEPTING...';
+              enterBtn.style.background = '#d97706';
+            }
+
+            // Settlement delay before auto-confirming (350ms)
+            setTimeout(() => {
+              if (!autoAcceptEnabled) return;
+              console.log('[⚡ Auto-Accept] Dispatched Enter to window ' + w.id);
+              sendAction(w.id, 'enter');
+            }, 350);
+          }
+        } else {
+          activeAutoAccepts.delete(w.id);
+        }
+      });
+    }
 
     // Haptics & Screen Wake Lock
     function triggerHaptic(duration = 15) {
@@ -976,6 +1106,14 @@ const HTML_APP = `<!DOCTYPE html>
           if (previewEl && previewEl.textContent !== (w.preview || '')) {
             previewEl.textContent = w.preview || '';
           }
+
+          const enterBtn = card.querySelector('.btn-enter');
+          if (enterBtn) {
+            const isAccepting = activeAutoAccepts.has(w.id);
+            enterBtn.textContent = isAccepting ? '⚡ ACCEPTING...' : '↵ Enter';
+            if (isAccepting) enterBtn.style.background = '#d97706';
+            else enterBtn.style.background = '';
+          }
         }
 
         // Update State Badge
@@ -1026,6 +1164,7 @@ const HTML_APP = `<!DOCTYPE html>
         try {
           currentWindows = JSON.parse(event.data);
           renderSpatialLayout(currentWindows);
+          checkAutoAccept(currentWindows);
         } catch (e) {
           console.error('Error parsing SSE data', e);
         }
@@ -1160,14 +1299,18 @@ const heartbeatTimer = setInterval(() => {
 server.listen(PORT, '0.0.0.0', () => {
   const localIp = getLocalIp();
   const hostname = os.hostname();
+  const phoneUrl = `http://${localIp}:${PORT}`;
 
   console.log(`\n======================================================`);
   console.log(`🚀 macOS Terminal Spatial Remote running on port ${PORT}`);
   console.log(`======================================================`);
   console.log(`Local Web App:    http://localhost:${PORT}`);
-  console.log(`Phone (LAN Wi-Fi): http://${localIp}:${PORT}`);
+  console.log(`Phone (LAN Wi-Fi): ${phoneUrl}`);
   console.log(`mDNS Link:        http://${hostname}:${PORT}`);
-  console.log(`\nEndpoints:`);
+  console.log(`\nScan with Phone Camera to Open Spatial Controller:`);
+  printQrCode(phoneUrl);
+  console.log(`======================================================`);
+  console.log(`Endpoints:`);
   console.log(`  • GET  /          -> 100% Spatial Multi-Monitor Controller`);
   console.log(`  • GET  /terminals -> JSON snapshot of open windows`);
   console.log(`  • GET  /events    -> Real-time SSE reactive stream`);
