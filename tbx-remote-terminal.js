@@ -982,9 +982,28 @@ const HTML_APP = `<!DOCTYPE html>
       font-size: 0.95rem;
     }
 
-    /* Bottom Enter Dock */
+    /* Workspace & Movable Enter Dock */
+    .workspace-main {
+      flex: 1 1 0;
+      min-height: 0;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .workspace-main[data-dock="top"] {
+      flex-direction: column;
+    }
+    .workspace-main[data-dock="left"],
+    .workspace-main[data-dock="right"] {
+      flex-direction: row;
+    }
+    .workspace-main .viewport-container {
+      order: 1;
+    }
     .enter-dock {
       flex: 0 0 auto;
+      order: 2;
       display: flex;
       align-items: stretch;
       gap: 6px;
@@ -992,6 +1011,31 @@ const HTML_APP = `<!DOCTYPE html>
       background: #090e1a;
       border-top: 1px solid var(--card-border);
       z-index: 2000;
+    }
+    .workspace-main[data-dock="top"] .enter-dock {
+      order: 0;
+      padding: 6px 8px;
+      border-top: none;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .workspace-main[data-dock="left"] .enter-dock,
+    .workspace-main[data-dock="right"] .enter-dock {
+      flex-direction: column;
+      width: clamp(56px, 11vw, 86px);
+      padding: 4px;
+      gap: 4px;
+      border-top: none;
+    }
+    .workspace-main[data-dock="inline"] .enter-dock {
+      display: none;
+    }
+    .workspace-main[data-dock="left"] .enter-dock {
+      order: 0;
+      border-right: 1px solid var(--card-border);
+    }
+    .workspace-main[data-dock="right"] .enter-dock {
+      order: 2;
+      border-left: 1px solid var(--card-border);
     }
     .enter-dock:empty {
       display: none;
@@ -1011,6 +1055,65 @@ const HTML_APP = `<!DOCTYPE html>
       justify-content: center;
       gap: 2px;
       color: #ffffff;
+    }
+    .workspace-main[data-dock="top"] button.dock-enter-btn {
+      border-top: 1px solid #1e293b;
+      border-bottom: 3px solid var(--win-color, var(--enter-btn));
+    }
+    .workspace-main[data-dock="left"] button.dock-enter-btn {
+      border-top: 1px solid #1e293b;
+      border-right: 3px solid var(--win-color, var(--enter-btn));
+      min-height: 0;
+      padding: 4px 3px;
+    }
+    .workspace-main[data-dock="right"] button.dock-enter-btn {
+      border-top: 1px solid #1e293b;
+      border-left: 3px solid var(--win-color, var(--enter-btn));
+      min-height: 0;
+      padding: 4px 3px;
+    }
+    .workspace-main[data-dock="left"] .dock-btn-label,
+    .workspace-main[data-dock="right"] .dock-btn-label {
+      font-size: clamp(0.56rem, 1.05vw, 0.7rem);
+      white-space: normal;
+      overflow-wrap: anywhere;
+      line-height: 1.15;
+    }
+    button.inline-enter-btn {
+      display: none;
+      flex: 0 0 auto;
+      width: 100%;
+      margin-top: 4px;
+      background: #111c33;
+      border: 1px solid #1e293b;
+      border-top: 3px solid var(--win-color, var(--enter-btn));
+      color: #cbd5e1;
+      font-size: clamp(0.8rem, 1.6vw, 1.15rem);
+      font-weight: 800;
+      min-height: clamp(32px, 4vh, 42px);
+    }
+    .workspace-main[data-dock="inline"] button.inline-enter-btn {
+      display: flex;
+    }
+    .spatial-window.action-required button.inline-enter-btn {
+      background: var(--enter-btn);
+      border-color: #4ade80;
+      border-top-color: #fbbf24;
+      color: #ffffff;
+      box-shadow: 0 0 16px rgba(22, 163, 74, 0.8);
+      animation: pulse-enter 1.6s infinite ease-in-out;
+    }
+    button.inline-enter-btn.is-sending {
+      background: #0369a1;
+      animation: none;
+    }
+    button.inline-enter-btn.is-sent {
+      background: #15803d;
+      animation: none;
+    }
+    button.inline-enter-btn.is-error {
+      background: #b91c1c;
+      animation: none;
     }
     button.dock-enter-btn:active {
       transform: scale(0.95);
@@ -1119,19 +1222,22 @@ const HTML_APP = `<!DOCTYPE html>
         <span id="statusText">Connecting</span>
       </div>
       <div class="status-badge" id="windowCount">0 windows</div>
+      <button type="button" class="header-btn" id="dockPosBtn" title="Move Enter dock (Bottom / Top / Left / Right)">⬇ Bottom</button>
       <button type="button" class="header-btn" id="fullscreenBtn" title="Toggle fullscreen">⛶ Full</button>
     </div>
   </header>
 
   <button type="button" class="header-btn immersive-exit-btn" id="immersiveExitBtn" title="Exit fullscreen">✕ Exit</button>
 
-  <div class="viewport-container" id="viewportContainer">
-    <div class="spatial-stage" id="spatialStage">
-      <div class="empty-state">Looking for Terminal.app windows...</div>
+  <main class="workspace-main" id="workspaceMain" data-dock="bottom">
+    <div class="viewport-container" id="viewportContainer">
+      <div class="spatial-stage" id="spatialStage">
+        <div class="empty-state">Looking for Terminal.app windows...</div>
+      </div>
     </div>
-  </div>
 
-  <div class="enter-dock" id="enterDock"></div>
+    <div class="enter-dock" id="enterDock"></div>
+  </main>
   <svg class="connector-layer" id="connectorLayer"></svg>
 
   <script>
@@ -1148,8 +1254,33 @@ const HTML_APP = `<!DOCTYPE html>
     const WINDOW_COLORS = ['#38bdf8', '#a78bfa', '#f472b6', '#34d399', '#fb923c', '#facc15', '#818cf8', '#2dd4bf'];
     let connectorTimer = null;
     const autoAcceptToggle = document.getElementById('autoAcceptToggle');
+    const workspaceMain = document.getElementById('workspaceMain');
+    const dockPosBtn = document.getElementById('dockPosBtn');
     const fullscreenBtn = document.getElementById('fullscreenBtn');
     const immersiveExitBtn = document.getElementById('immersiveExitBtn');
+
+    const DOCK_POSITIONS = ['bottom', 'top', 'left', 'right', 'inline'];
+    const DOCK_LABELS = { bottom: '⬇ Bottom', top: '⬆ Top', left: '⬅ Left', right: '➡ Right', inline: '▣ Inline' };
+    let dockPos = localStorage.getItem('tbx_dock_pos');
+    if (!DOCK_POSITIONS.includes(dockPos)) dockPos = 'bottom';
+
+    function applyDockPosition() {
+      if (workspaceMain) workspaceMain.setAttribute('data-dock', dockPos);
+      if (dockPosBtn) dockPosBtn.textContent = DOCK_LABELS[dockPos];
+      if (typeof handleResize === 'function') {
+        requestAnimationFrame(handleResize);
+      }
+    }
+    applyDockPosition();
+
+    if (dockPosBtn) {
+      dockPosBtn.addEventListener('click', () => {
+        triggerHaptic(20);
+        dockPos = DOCK_POSITIONS[(DOCK_POSITIONS.indexOf(dockPos) + 1) % DOCK_POSITIONS.length];
+        localStorage.setItem('tbx_dock_pos', dockPos);
+        applyDockPosition();
+      });
+    }
 
     function isNativeFullscreen() {
       return !!(document.fullscreenElement || document.webkitFullscreenElement);
@@ -1388,6 +1519,23 @@ const HTML_APP = `<!DOCTYPE html>
         if (stage === 'sending' || stage === 'started') card.classList.add('is-sending');
         else if (stage === 'completed') card.classList.add('is-sent');
         else if (stage === 'error') card.classList.add('is-error');
+
+        const inlineBtn = card.querySelector('.inline-enter-btn');
+        if (inlineBtn) {
+          inlineBtn.classList.remove('is-sending', 'is-sent', 'is-error');
+          if (stage === 'sending' || stage === 'started') {
+            inlineBtn.classList.add('is-sending');
+            inlineBtn.textContent = stage === 'started' ? '⚡ Running...' : '⏳ Sending...';
+          } else if (stage === 'completed') {
+            inlineBtn.classList.add('is-sent');
+            inlineBtn.textContent = '✓ Sent';
+          } else if (stage === 'error') {
+            inlineBtn.classList.add('is-error');
+            inlineBtn.textContent = '✕ Failed';
+          } else {
+            inlineBtn.textContent = activeAutoAccepts.has(windowId) ? '⚡ ACCEPTING...' : '↵ Enter';
+          }
+        }
       }
 
       const btn = enterDock ? enterDock.querySelector('.dock-enter-btn[data-id="' + windowId + '"]') : null;
@@ -1500,7 +1648,7 @@ const HTML_APP = `<!DOCTYPE html>
     function drawConnectors(windows, colorById) {
       if (!connectorLayer) return;
       connectorLayer.innerHTML = '';
-      if (!windows || !windows.length) return;
+      if (!windows || !windows.length || dockPos === 'inline') return;
 
       const ns = 'http://www.w3.org/2000/svg';
       windows.forEach(w => {
@@ -1512,11 +1660,36 @@ const HTML_APP = `<!DOCTYPE html>
         const bRect = btn.getBoundingClientRect();
         if (!cRect.width || !bRect.width) return;
 
-        const x1 = cRect.left + cRect.width / 2;
-        const y1 = cRect.bottom;
-        const x2 = bRect.left + bRect.width / 2;
-        const y2 = bRect.top;
-        const dy = Math.max(Math.abs(y2 - y1) * 0.5, 24);
+        let x1, y1, x2, y2, cx1, cy1, cx2, cy2;
+        if (dockPos === 'top') {
+          x1 = cRect.left + cRect.width / 2;
+          y1 = cRect.top;
+          x2 = bRect.left + bRect.width / 2;
+          y2 = bRect.bottom;
+          const dy = Math.max(Math.abs(y1 - y2) * 0.5, 24);
+          cx1 = x1; cy1 = y1 - dy; cx2 = x2; cy2 = y2 + dy;
+        } else if (dockPos === 'left') {
+          x1 = cRect.left;
+          y1 = cRect.top + cRect.height / 2;
+          x2 = bRect.right;
+          y2 = bRect.top + bRect.height / 2;
+          const dx = Math.max(Math.abs(x1 - x2) * 0.5, 24);
+          cx1 = x1 - dx; cy1 = y1; cx2 = x2 + dx; cy2 = y2;
+        } else if (dockPos === 'right') {
+          x1 = cRect.right;
+          y1 = cRect.top + cRect.height / 2;
+          x2 = bRect.left;
+          y2 = bRect.top + bRect.height / 2;
+          const dx = Math.max(Math.abs(x2 - x1) * 0.5, 24);
+          cx1 = x1 + dx; cy1 = y1; cx2 = x2 - dx; cy2 = y2;
+        } else {
+          x1 = cRect.left + cRect.width / 2;
+          y1 = cRect.bottom;
+          x2 = bRect.left + bRect.width / 2;
+          y2 = bRect.top;
+          const dy = Math.max(Math.abs(y2 - y1) * 0.5, 24);
+          cx1 = x1; cy1 = y1 + dy; cx2 = x2; cy2 = y2 - dy;
+        }
         const dispatchStage = keyDispatchState.get(w.id)?.stage || null;
         const isSending = dispatchStage === 'sending' || dispatchStage === 'started';
         const isActionRequired = w.agyState && w.agyState.actionRequired;
@@ -1527,7 +1700,7 @@ const HTML_APP = `<!DOCTYPE html>
 
         const path = document.createElementNS(ns, 'path');
         path.setAttribute('data-id', w.id);
-        path.setAttribute('d', 'M ' + x1 + ' ' + y1 + ' C ' + x1 + ' ' + (y1 + dy) + ', ' + x2 + ' ' + (y2 - dy) + ', ' + x2 + ' ' + y2);
+        path.setAttribute('d', 'M ' + x1 + ' ' + y1 + ' C ' + cx1 + ' ' + cy1 + ', ' + cx2 + ' ' + cy2 + ', ' + x2 + ' ' + y2);
         path.setAttribute('fill', 'none');
         path.setAttribute('stroke', color);
         path.setAttribute('stroke-width', (isActionRequired || dispatchStage) ? '3' : '1.5');
@@ -1556,7 +1729,7 @@ const HTML_APP = `<!DOCTYPE html>
 
     function renderEnterDock(sortedWindows, colorById) {
       if (!enterDock) return;
-      if (!sortedWindows.length) {
+      if (!sortedWindows.length || dockPos === 'inline') {
         enterDock.innerHTML = '';
         return;
       }
@@ -1627,11 +1800,18 @@ const HTML_APP = `<!DOCTYPE html>
         return;
       }
 
+      const isVerticalDock = dockPos === 'left' || dockPos === 'right';
       const sortedWindows = [...windows].sort((a, b) => {
         const ax = a.position.x + a.size.width / 2;
         const bx = b.position.x + b.size.width / 2;
+        const ay = a.position.y + a.size.height / 2;
+        const by = b.position.y + b.size.height / 2;
+        if (isVerticalDock) {
+          if (Math.abs(ay - by) > 40) return ay - by;
+          return ax - bx;
+        }
         if (Math.abs(ax - bx) > 40) return ax - bx;
-        return (a.position.y + a.size.height / 2) - (b.position.y + b.size.height / 2);
+        return ay - by;
       });
       const colorById = new Map();
       sortedWindows.forEach((w, idx) => {
@@ -1747,6 +1927,7 @@ const HTML_APP = `<!DOCTYPE html>
               </div>
 
               <pre class="terminal-preview">\${escapeHtml(w.preview || '')}</pre>
+              <button type="button" class="inline-enter-btn" onclick="sendAction(\${w.id}, 'enter')">↵ Enter</button>
             </div>
           \`;
           spatialStage.appendChild(card);
@@ -1766,6 +1947,26 @@ const HTML_APP = `<!DOCTYPE html>
           const previewEl = card.querySelector('.terminal-preview');
           if (previewEl && previewEl.textContent !== (w.preview || '')) {
             previewEl.textContent = w.preview || '';
+          }
+
+          const inlineBtn = card.querySelector('.inline-enter-btn');
+          if (inlineBtn) {
+            const stage = keyDispatchState.get(w.id)?.stage || null;
+            inlineBtn.classList.remove('is-sending', 'is-sent', 'is-error');
+            if (stage === 'sending' || stage === 'started') {
+              inlineBtn.classList.add('is-sending');
+              inlineBtn.textContent = stage === 'started' ? '⚡ Running...' : '⏳ Sending...';
+            } else if (stage === 'completed') {
+              inlineBtn.classList.add('is-sent');
+              inlineBtn.textContent = '✓ Sent';
+            } else if (stage === 'error') {
+              inlineBtn.classList.add('is-error');
+              inlineBtn.textContent = '✕ Failed';
+            } else {
+              const isAccepting = activeAutoAccepts.has(w.id);
+              inlineBtn.textContent = isAccepting ? '⚡ ACCEPTING...' : '↵ Enter';
+              inlineBtn.style.background = isAccepting ? '#d97706' : '';
+            }
           }
         }
 
