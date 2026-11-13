@@ -310,7 +310,7 @@ const JXA_FETCH_SCRIPT = `
 
         const nonEmpty = lines.map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0; });
         analysis = nonEmpty.slice(-14).join("\\n");
-        preview = nonEmpty.slice(-6).join("\\n");
+        preview = nonEmpty.slice(-25).join("\\n");
       }
     } catch (e) {}
     
@@ -334,7 +334,7 @@ const JXA_FETCH_SCRIPT = `
 
 /**
  * Clean terminal preview text by removing runs of 2+ '-' or '─' characters,
- * collapsing consecutive whitespace into a single space, and keeping the last 6 non-empty lines.
+ * collapsing consecutive whitespace into a single space, and keeping the last 15 non-empty lines.
  */
 function formatPreviewText(text) {
   if (!text) return '';
@@ -342,7 +342,7 @@ function formatPreviewText(text) {
     .split(/\r?\n/)
     .map(line => line.replace(/[-─]{2,}/g, '').replace(/[^\S\n]{2,}/g, ' ').trim())
     .filter(line => line.length > 0)
-    .slice(-6)
+    .slice(-15)
     .join('\n');
 }
 
@@ -373,7 +373,7 @@ function fetchTerminalState() {
           rows: w.rows,
           tty: w.tty,
           busy: w.busy,
-          preview: formatPreviewText(w.analysis || w.preview),
+          preview: formatPreviewText(w.preview || w.analysis),
           agyState: agyState
         };
       });
@@ -681,21 +681,6 @@ const HTML_APP = `<!DOCTYPE html>
     .auto-accept-container input:checked + .auto-accept-switch::after {
       transform: translateX(12px);
     }
-    .enter-only-container:has(input:checked) {
-      border-color: #16a34a;
-      background: #081c10;
-    }
-    .enter-only-container:has(input:checked) .auto-accept-label {
-      color: #4ade80;
-    }
-    .enter-only-container input:checked + .auto-accept-switch {
-      background: #16a34a;
-    }
-
-    body.enter-only .button-pad .button-row:first-child,
-    body.enter-only .button-pad button:not(.btn-enter) {
-      display: none;
-    }
 
     /* Header Pill Button (overrides global keypad button sizing) */
     button.header-btn {
@@ -987,20 +972,6 @@ const HTML_APP = `<!DOCTYPE html>
       animation: pulse-enter 1.6s infinite ease-in-out;
     }
 
-    button.btn-esc {
-      background: #334155;
-      color: #cbd5e1;
-      flex: 0.8;
-      font-size: clamp(0.75rem, 1.5vw, 0.95rem);
-    }
-    button.btn-focus {
-      background: #1e293b;
-      border: 1px solid #334155;
-      color: var(--accent);
-      font-size: clamp(0.75rem, 1.5vw, 0.95rem);
-      flex: 1;
-    }
-
     /* Empty state */
     .empty-state {
       display: flex;
@@ -1019,11 +990,6 @@ const HTML_APP = `<!DOCTYPE html>
       <h1>Terminal Spatial Remote</h1>
     </div>
     <div class="header-info">
-      <label class="auto-accept-container enter-only-container" title="Hide all buttons except Enter">
-        <span class="auto-accept-label">Enter Only</span>
-        <input type="checkbox" id="enterOnlyToggle">
-        <span class="auto-accept-switch"></span>
-      </label>
       <label class="auto-accept-container" title="Automatically dispatch Enter when an action is required">
         <span class="auto-accept-label">Auto-Accept</span>
         <input type="checkbox" id="autoAcceptToggle">
@@ -1060,7 +1026,6 @@ const HTML_APP = `<!DOCTYPE html>
     const viewportContainer = document.getElementById('viewportContainer');
     const spatialStage = document.getElementById('spatialStage');
     const autoAcceptToggle = document.getElementById('autoAcceptToggle');
-    const enterOnlyToggle = document.getElementById('enterOnlyToggle');
     const fullscreenBtn = document.getElementById('fullscreenBtn');
     const immersiveExitBtn = document.getElementById('immersiveExitBtn');
 
@@ -1116,19 +1081,6 @@ const HTML_APP = `<!DOCTYPE html>
     if (immersiveExitBtn) immersiveExitBtn.addEventListener('click', toggleFullscreen);
     document.addEventListener('fullscreenchange', updateFullscreenUI);
     document.addEventListener('webkitfullscreenchange', updateFullscreenUI);
-
-    // Enter-Only toggle state (hides all buttons except Enter)
-    let enterOnlyEnabled = localStorage.getItem('tbx_enter_only') === 'true';
-    document.body.classList.toggle('enter-only', enterOnlyEnabled);
-    if (enterOnlyToggle) {
-      enterOnlyToggle.checked = enterOnlyEnabled;
-      enterOnlyToggle.addEventListener('change', () => {
-        enterOnlyEnabled = enterOnlyToggle.checked;
-        localStorage.setItem('tbx_enter_only', enterOnlyEnabled ? 'true' : 'false');
-        document.body.classList.toggle('enter-only', enterOnlyEnabled);
-        triggerHaptic(30);
-      });
-    }
 
     // Auto-Accept toggle and execution state
     let autoAcceptEnabled = localStorage.getItem('tbx_auto_accept') === 'true';
@@ -1442,13 +1394,7 @@ const HTML_APP = `<!DOCTYPE html>
 
               <div class="button-pad">
                 <div class="button-row">
-                  <button onclick="sendAction(\${w.id}, 'up')">▲ Up</button>
-                  <button onclick="sendAction(\${w.id}, 'down')">▼ Down</button>
-                  <button class="btn-esc" onclick="sendAction(\${w.id}, 'esc')">Esc</button>
-                </div>
-                <div class="button-row">
                   <button class="btn-enter" onclick="sendAction(\${w.id}, 'enter')">↵ Enter</button>
-                  <button class="btn-focus" onclick="sendAction(\${w.id}, 'focus')">Focus</button>
                 </div>
               </div>
             </div>
