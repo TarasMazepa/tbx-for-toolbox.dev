@@ -981,6 +981,83 @@ const HTML_APP = `<!DOCTYPE html>
       color: var(--text-muted);
       font-size: 0.95rem;
     }
+
+    /* Bottom Enter Dock */
+    .enter-dock {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: stretch;
+      gap: 6px;
+      padding: 6px 8px calc(var(--safe-bottom) + 6px) 8px;
+      background: #090e1a;
+      border-top: 1px solid var(--card-border);
+      z-index: 2000;
+    }
+    .enter-dock:empty {
+      display: none;
+    }
+    button.dock-enter-btn {
+      flex: 1 1 0;
+      min-width: 0;
+      min-height: clamp(42px, 5.5vh, 54px);
+      padding: 6px 8px;
+      border-radius: 10px;
+      background: #111c33;
+      border: 1px solid #1e293b;
+      border-top: 3px solid var(--win-color, var(--enter-btn));
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      color: #ffffff;
+    }
+    button.dock-enter-btn:active {
+      transform: scale(0.95);
+      background: #1e293b;
+    }
+    button.dock-enter-btn.action-required {
+      background: var(--enter-btn);
+      border-color: #4ade80;
+      border-top-color: #fbbf24;
+      box-shadow: 0 0 16px rgba(22, 163, 74, 0.8);
+      animation: pulse-enter 1.6s infinite ease-in-out;
+    }
+    .dock-btn-label {
+      width: 100%;
+      font-size: clamp(0.65rem, 1.3vw, 0.8rem);
+      font-weight: 700;
+      color: #cbd5e1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: center;
+    }
+    button.dock-enter-btn.action-required .dock-btn-label {
+      color: #fef08a;
+    }
+    .dock-btn-action {
+      font-size: clamp(0.82rem, 1.6vw, 1.1rem);
+      font-weight: 800;
+      color: #ffffff;
+    }
+    .window-color-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--win-color, var(--accent));
+      flex-shrink: 0;
+    }
+
+    /* Visual SVG Connector Overlay */
+    .connector-layer {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1500;
+    }
   </style>
 </head>
 <body>
@@ -1016,6 +1093,9 @@ const HTML_APP = `<!DOCTYPE html>
     </div>
   </div>
 
+  <div class="enter-dock" id="enterDock"></div>
+  <svg class="connector-layer" id="connectorLayer"></svg>
+
   <script>
     let currentWindows = [];
     let currentDisplays = [];
@@ -1025,6 +1105,10 @@ const HTML_APP = `<!DOCTYPE html>
     const windowCount = document.getElementById('windowCount');
     const viewportContainer = document.getElementById('viewportContainer');
     const spatialStage = document.getElementById('spatialStage');
+    const enterDock = document.getElementById('enterDock');
+    const connectorLayer = document.getElementById('connectorLayer');
+    const WINDOW_COLORS = ['#38bdf8', '#a78bfa', '#f472b6', '#34d399', '#fb923c', '#facc15', '#818cf8', '#2dd4bf'];
+    let connectorTimer = null;
     const autoAcceptToggle = document.getElementById('autoAcceptToggle');
     const fullscreenBtn = document.getElementById('fullscreenBtn');
     const immersiveExitBtn = document.getElementById('immersiveExitBtn');
@@ -1110,12 +1194,11 @@ const HTML_APP = `<!DOCTYPE html>
             activeAutoAccepts.add(w.id);
             console.log('[⚡ Auto-Accept] Action required on window ' + w.id + ' (' + w.name + '). Scheduling Enter...');
 
-            // Flash visual status on the button
-            const card = document.querySelector('.spatial-window[data-id="' + w.id + '"]');
-            const enterBtn = card ? card.querySelector('.btn-enter') : null;
+            // Flash visual status on the dock Enter button
+            const enterBtn = enterDock ? enterDock.querySelector('.dock-enter-btn[data-id="' + w.id + '"] .dock-btn-action') : null;
             if (enterBtn) {
               enterBtn.textContent = '⚡ ACCEPTING...';
-              enterBtn.style.background = '#d97706';
+              enterBtn.parentElement.style.background = '#d97706';
             }
 
             // Settlement delay before auto-confirming (350ms)
@@ -1275,13 +1358,133 @@ const HTML_APP = `<!DOCTYPE html>
       }
     }
 
+    function getShortWindowLabel(name) {
+      if (!name) return 'Terminal';
+      return name.split('—')[0].trim() || name;
+    }
+
+    function drawConnectors(windows, colorById) {
+      if (!connectorLayer) return;
+      connectorLayer.innerHTML = '';
+      if (!windows || !windows.length) return;
+
+      const ns = 'http://www.w3.org/2000/svg';
+      windows.forEach(w => {
+        const card = spatialStage.querySelector('.spatial-window[data-id="' + w.id + '"] .window-card');
+        const btn = enterDock ? enterDock.querySelector('.dock-enter-btn[data-id="' + w.id + '"]') : null;
+        if (!card || !btn) return;
+
+        const cRect = card.getBoundingClientRect();
+        const bRect = btn.getBoundingClientRect();
+        if (!cRect.width || !bRect.width) return;
+
+        const x1 = cRect.left + cRect.width / 2;
+        const y1 = cRect.bottom;
+        const x2 = bRect.left + bRect.width / 2;
+        const y2 = bRect.top;
+        const dy = Math.max(Math.abs(y2 - y1) * 0.5, 24);
+        const isActionRequired = w.agyState && w.agyState.actionRequired;
+        const color = isActionRequired ? '#fbbf24' : (colorById.get(w.id) || '#38bdf8');
+
+        const path = document.createElementNS(ns, 'path');
+        path.setAttribute('d', 'M ' + x1 + ' ' + y1 + ' C ' + x1 + ' ' + (y1 + dy) + ', ' + x2 + ' ' + (y2 - dy) + ', ' + x2 + ' ' + y2);
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', color);
+        path.setAttribute('stroke-width', isActionRequired ? '2.5' : '1.5');
+        path.setAttribute('stroke-opacity', isActionRequired ? '0.95' : '0.45');
+        connectorLayer.appendChild(path);
+
+        [[x1, y1], [x2, y2]].forEach(([cx, cy]) => {
+          const dot = document.createElementNS(ns, 'circle');
+          dot.setAttribute('cx', cx);
+          dot.setAttribute('cy', cy);
+          dot.setAttribute('r', isActionRequired ? '4' : '3');
+          dot.setAttribute('fill', color);
+          dot.setAttribute('fill-opacity', isActionRequired ? '1' : '0.75');
+          connectorLayer.appendChild(dot);
+        });
+      });
+    }
+
+    function scheduleConnectors(windows, colorById) {
+      requestAnimationFrame(() => drawConnectors(windows, colorById));
+      if (connectorTimer) clearTimeout(connectorTimer);
+      connectorTimer = setTimeout(() => drawConnectors(windows, colorById), 320);
+    }
+
+    function renderEnterDock(sortedWindows, colorById) {
+      if (!enterDock) return;
+      if (!sortedWindows.length) {
+        enterDock.innerHTML = '';
+        return;
+      }
+
+      const existingBtns = new Map();
+      enterDock.querySelectorAll('.dock-enter-btn').forEach(el => {
+        existingBtns.set(parseInt(el.getAttribute('data-id'), 10), el);
+      });
+      const currentIds = new Set(sortedWindows.map(w => w.id));
+      for (const [id, el] of existingBtns) {
+        if (!currentIds.has(id)) {
+          el.remove();
+          existingBtns.delete(id);
+        }
+      }
+
+      sortedWindows.forEach(w => {
+        const shortName = getShortWindowLabel(w.name);
+        const isActionRequired = !!(w.agyState && w.agyState.actionRequired);
+        const isAccepting = activeAutoAccepts.has(w.id);
+        const color = colorById.get(w.id) || '#38bdf8';
+
+        let btn = existingBtns.get(w.id);
+        if (!btn) {
+          btn = document.createElement('button');
+          btn.type = 'button';
+          btn.setAttribute('data-id', w.id);
+          btn.className = 'dock-enter-btn';
+          btn.innerHTML = '<span class="dock-btn-label"></span><span class="dock-btn-action">↵ Enter</span>';
+          btn.addEventListener('click', () => sendAction(w.id, 'enter'));
+          enterDock.appendChild(btn);
+        } else {
+          enterDock.appendChild(btn);
+        }
+
+        btn.style.setProperty('--win-color', color);
+        btn.className = 'dock-enter-btn' + (isActionRequired ? ' action-required' : '');
+        btn.title = w.name;
+        const labelEl = btn.querySelector('.dock-btn-label');
+        if (labelEl && labelEl.textContent !== shortName) {
+          labelEl.textContent = shortName;
+        }
+        const actionEl = btn.querySelector('.dock-btn-action');
+        if (actionEl) {
+          actionEl.textContent = isAccepting ? '⚡ ACCEPTING...' : '↵';
+          btn.style.background = isAccepting ? '#d97706' : '';
+        }
+      });
+    }
+
     // Render Full Spatial Desktop Layout with Ambient Lighting (Muted vs Lit)
     function renderSpatialLayout(windows, displays = []) {
       windowCount.textContent = windows.length + ' window' + (windows.length === 1 ? '' : 's');
       if (!windows.length) {
         spatialStage.innerHTML = '<div class="empty-state">No open Terminal.app windows found</div>';
+        renderEnterDock([], new Map());
+        drawConnectors([], new Map());
         return;
       }
+
+      const sortedWindows = [...windows].sort((a, b) => {
+        const ax = a.position.x + a.size.width / 2;
+        const bx = b.position.x + b.size.width / 2;
+        if (Math.abs(ax - bx) > 40) return ax - bx;
+        return (a.position.y + a.size.height / 2) - (b.position.y + b.size.height / 2);
+      });
+      const colorById = new Map();
+      sortedWindows.forEach((w, idx) => {
+        colorById.set(w.id, WINDOW_COLORS[idx % WINDOW_COLORS.length]);
+      });
 
       // Remove empty state message if present
       const emptyState = spatialStage.querySelector('.empty-state');
@@ -1383,6 +1586,7 @@ const HTML_APP = `<!DOCTYPE html>
           card.innerHTML = \`
             <div class="window-card">
               <div class="card-header" onclick="sendAction(\${w.id}, 'focus')">
+                <span class="window-color-dot"></span>
                 <div class="window-title" title="\${escapeHtml(w.name)}">\${escapeHtml(w.name)}</div>
                 <div class="header-badges">
                   <span class="state-badge" style="display: none"></span>
@@ -1391,12 +1595,6 @@ const HTML_APP = `<!DOCTYPE html>
               </div>
 
               <pre class="terminal-preview">\${escapeHtml(w.preview || '')}</pre>
-
-              <div class="button-pad">
-                <div class="button-row">
-                  <button class="btn-enter" onclick="sendAction(\${w.id}, 'enter')">↵ Enter</button>
-                </div>
-              </div>
             </div>
           \`;
           spatialStage.appendChild(card);
@@ -1416,14 +1614,6 @@ const HTML_APP = `<!DOCTYPE html>
           const previewEl = card.querySelector('.terminal-preview');
           if (previewEl && previewEl.textContent !== (w.preview || '')) {
             previewEl.textContent = w.preview || '';
-          }
-
-          const enterBtn = card.querySelector('.btn-enter');
-          if (enterBtn) {
-            const isAccepting = activeAutoAccepts.has(w.id);
-            enterBtn.textContent = isAccepting ? '⚡ ACCEPTING...' : '↵ Enter';
-            if (isAccepting) enterBtn.style.background = '#d97706';
-            else enterBtn.style.background = '';
           }
         }
 
@@ -1445,12 +1635,16 @@ const HTML_APP = `<!DOCTYPE html>
         if (isActionRequired) classNames += ' action-required';
         card.className = classNames;
 
+        card.style.setProperty('--win-color', colorById.get(w.id) || '#38bdf8');
         card.style.left = leftPercent + '%';
         card.style.top = topPercent + '%';
         card.style.width = widthPercent + '%';
         card.style.height = heightPercent + '%';
         card.style.zIndex = isActionRequired ? 1001 : zIndex;
       });
+
+      renderEnterDock(sortedWindows, colorById);
+      scheduleConnectors(sortedWindows, colorById);
     }
 
     // Re-render on resize, orientation change, or fold/unfold
