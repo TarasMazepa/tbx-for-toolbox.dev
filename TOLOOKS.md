@@ -12,6 +12,15 @@ Exploratory scratchpad for backlog ideas, investigative spikes, architectural in
 
 ## Resolved Architectural Decisions
 
+- [x] **3. Screen Sleep & Dimming Prevention in Remote Terminal**
+  - **Status**: Implemented in [`tbx-remote-terminal.js`](tbx-remote-terminal.js).
+  - **Resolution**:
+    1. **Eliminated UI Darkening**: Removed aggressive idle/running dimming (`opacity: 0.35`, `grayscale(85%)`) from the button pad CSS so controls and the webpage remain crisp, vibrant, and readable at all times instead of fading to dark.
+    2. **HTTP LAN NoSleep Engine**: Solved the restriction where mobile browsers silently block `navigator.wakeLock` on non-HTTPS LAN connections (`http://<ip>:8999`). Embedded an in-memory seamless looping MP4 video served at `/nosleep.mp4` with inline loop enforcement, keeping iOS Safari and Android Chrome displays awake over plain Wi-Fi HTTP.
+    3. **Persistent Client Wake Lock**: Supported dual-layer keep-awake (native `navigator.wakeLock` when available + HTML5 media loop fallback) with automatic re-arming on load, SSE connect, `visibilitychange` (unlocking phone/returning to tab), and touch/click interactions.
+    4. **Interactive Wake Status Header Badge**: Added a `☀️ Awake` indicator badge in the web controller header reflecting real-time wake lock status with tap-to-reacquire support.
+    5. **macOS Host Sleep Preserved**: Kept macOS host power management untouched without running `caffeinate`, ensuring the Mac can sleep normally according to system preferences.
+
 - [x] **2. Multi-Monitor True Y-Coordinate Layout Detection in Remote Terminal**
   - **Status**: Implemented in [`tbx-remote-terminal.js`](tbx-remote-terminal.js).
   - **Resolution**:
