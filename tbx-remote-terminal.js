@@ -1441,6 +1441,15 @@ const HTML_APP = `<!DOCTYPE html>
 
       let timer = null;
       if (stage === 'completed' || stage === 'error') {
+        if (stage === 'completed') {
+          const win = currentWindows.find(w => w.id === id);
+          if (win && win.agyState && win.agyState.actionRequired) {
+            win.agyState.actionRequired = false;
+            win.agyState.status = 'running';
+            win.agyState.label = 'RUNNING';
+            win.agyState.color = 'blue';
+          }
+        }
         timer = setTimeout(() => {
           keyDispatchState.delete(id);
           if (currentWindows.length) renderSpatialLayout(currentWindows, currentDisplays);
@@ -1939,6 +1948,7 @@ const server = http.createServer(async (req, res) => {
       if (sseClients.size > 0) {
         broadcast(JSON.stringify({ type: 'key_status', windowId: targetWindowId, key: targetKey, stage: 'completed' }));
       }
+      setTimeout(pollAndBroadcast, 150);
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(result));
@@ -1958,8 +1968,7 @@ const server = http.createServer(async (req, res) => {
   res.end(JSON.stringify({ error: 'Not found', routes: ['/', '/terminals', '/events', '/api/key'] }));
 });
 
-// Periodic background change detection
-const checkTimer = setInterval(() => {
+function pollAndBroadcast() {
   const current = fetchTerminalState();
   const hash = computeStateHash(current);
 
@@ -1973,7 +1982,10 @@ const checkTimer = setInterval(() => {
       broadcast(lastStateJson);
     }
   }
-}, POLL_INTERVAL_MS);
+}
+
+// Periodic background change detection
+const checkTimer = setInterval(pollAndBroadcast, POLL_INTERVAL_MS);
 
 // Heartbeat keep-alive every 15s to keep connections healthy
 const heartbeatTimer = setInterval(() => {
