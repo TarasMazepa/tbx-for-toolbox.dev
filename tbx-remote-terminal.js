@@ -333,6 +333,20 @@ const JXA_FETCH_SCRIPT = `
 `.trim();
 
 /**
+ * Clean terminal preview text by removing runs of 2+ '-' or '─' characters,
+ * collapsing consecutive whitespace into a single space, and keeping the last 6 non-empty lines.
+ */
+function formatPreviewText(text) {
+  if (!text) return '';
+  return text
+    .split(/\r?\n/)
+    .map(line => line.replace(/[-─]{2,}/g, '').replace(/[^\S\n]{2,}/g, ' ').trim())
+    .filter(line => line.length > 0)
+    .slice(-6)
+    .join('\n');
+}
+
+/**
  * Query current Terminal.app window and multi-monitor display state
  */
 function fetchTerminalState() {
@@ -359,7 +373,7 @@ function fetchTerminalState() {
           rows: w.rows,
           tty: w.tty,
           busy: w.busy,
-          preview: w.preview,
+          preview: formatPreviewText(w.analysis || w.preview),
           agyState: agyState
         };
       });
