@@ -22,7 +22,7 @@
 
 const http = require('http');
 const os = require('os');
-const { execFileSync } = require('child_process');
+const { execFile, execFileSync } = require('child_process');
 const crypto = require('crypto');
 
 
@@ -346,6 +346,55 @@ function formatPreviewText(text) {
     .join('\n');
 }
 
+const summaryCache = new Map();
+
+/**
+ * Asynchronously summarize an action-required terminal prompt using `agy -p`
+ * and trigger an SSE broadcast when the summary is ready.
+ */
+function requestPromptSummary(windowId, windowName, text) {
+  const cleanText = (text || '').trim();
+  if (!cleanText) return { status: null, summary: '' };
+
+  const hash = crypto.createHash('sha1').update(cleanText).digest('hex');
+  const cached = summaryCache.get(windowId);
+  if (cached && cached.hash === hash) {
+    return { status: cached.status, summary: cached.summary };
+  }
+
+  summaryCache.set(windowId, { hash, status: 'loading', summary: '' });
+
+  const prompt = `URGENT / TIME-SENSITIVE: Give an immediate, ultra-fast summary\n\n${cleanText}`;
+
+  const model = process.env.SUMMARY_MODEL || 'gemini-4-hydrogen-low';
+  const args = [
+    '-p', prompt,
+    '--model', model,
+    '--effort', 'low',
+    '--disable-slash-commands',
+    '--output-format', 'text'
+  ];
+
+  execFile('agy', args, { cwd: os.tmpdir(), encoding: 'utf8', maxBuffer: 1024 * 64 }, (err, stdout) => {
+    const current = summaryCache.get(windowId);
+    if (!current || current.hash !== hash) return;
+
+    const summary = !err && stdout ? stdout.trim().replace(/\s+/g, ' ') : '';
+    if (summary) {
+      summaryCache.set(windowId, { hash, status: 'ready', summary });
+      console.log(`[✨] Summary ready for window ${windowId}: ${summary}`);
+    } else {
+      summaryCache.set(windowId, { hash, status: 'error', summary: '' });
+      if (err) console.error(`[!] Summary failed for window ${windowId}:`, err.message);
+    }
+    if (typeof pollAndBroadcast === 'function') {
+      pollAndBroadcast();
+    }
+  });
+
+  return { status: 'loading', summary: '' };
+}
+
 /**
  * Query current Terminal.app window and multi-monitor display state
  */
@@ -363,6 +412,13 @@ function fetchTerminalState() {
     if (Array.isArray(rawWindows)) {
       const enriched = rawWindows.map(w => {
         const agyState = detectAgyState(w.name, w.analysis || w.preview, w.cols);
+        const formattedPreview = formatPreviewText(w.preview || w.analysis);
+        let summaryInfo = { status: null, summary: '' };
+        if (agyState.actionRequired) {
+          summaryInfo = requestPromptSummary(w.id, w.name, w.analysis || formattedPreview);
+        } else {
+          summaryCache.delete(w.id);
+        }
         return {
           id: w.id,
           name: w.name,
@@ -373,8 +429,10 @@ function fetchTerminalState() {
           rows: w.rows,
           tty: w.tty,
           busy: w.busy,
-          preview: formatPreviewText(w.preview || w.analysis),
-          agyState: agyState
+          preview: formattedPreview,
+          agyState: agyState,
+          summary: summaryInfo.summary,
+          summaryStatus: summaryInfo.status
         };
       });
       const state = { windows: enriched, displays: displays };
@@ -479,6 +537,8 @@ function computeStateHash(state) {
     size: w.size,
     status: w.agyState ? w.agyState.status : 'idle',
     actionRequired: w.agyState ? w.agyState.actionRequired : false,
+    summary: w.summary || '',
+    summaryStatus: w.summaryStatus || '',
     preview: w.name.includes('tbx-remote-terminal') ? '' : w.preview
   }));
   return crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
@@ -893,6 +953,27 @@ const HTML_APP = `<!DOCTYPE html>
       border-color: rgba(245, 158, 11, 0.5);
       background: #0a0a16;
       color: #fef08a;
+    }
+
+    /* AI Prompt Summary Banner */
+    .ai-summary {
+      display: none;
+      flex: 0 0 auto;
+      margin: 2px 0 4px 0;
+      padding: 5px 8px;
+      border-radius: 7px;
+      background: rgba(245, 158, 11, 0.16);
+      border: 1px solid rgba(245, 158, 11, 0.65);
+      color: #fef3c7;
+      font-size: clamp(0.68rem, 1.25vw, 0.85rem);
+      font-weight: 600;
+      line-height: 1.25;
+      word-break: break-word;
+    }
+    .ai-summary.loading {
+      color: #fde68a;
+      opacity: 0.75;
+      font-style: italic;
     }
 
     /* BUTTON PAD: CRISP, VIBRANT & READABLE AT ALL TIMES */
@@ -1926,6 +2007,7 @@ const HTML_APP = `<!DOCTYPE html>
                 </div>
               </div>
 
+              <div class="ai-summary" style="display: none"></div>
               <pre class="terminal-preview">\${escapeHtml(w.preview || '')}</pre>
               <button type="button" class="inline-enter-btn" onclick="sendAction(\${w.id}, 'enter')">↵ Enter</button>
             </div>
@@ -1967,6 +2049,22 @@ const HTML_APP = `<!DOCTYPE html>
               inlineBtn.textContent = isAccepting ? '⚡ ACCEPTING...' : '↵ Enter';
               inlineBtn.style.background = isAccepting ? '#d97706' : '';
             }
+          }
+        }
+
+        // Update AI Summary Banner
+        const summaryEl = card.querySelector('.ai-summary');
+        if (summaryEl) {
+          if (w.summaryStatus === 'ready' && w.summary) {
+            summaryEl.textContent = '✨ ' + w.summary;
+            summaryEl.className = 'ai-summary';
+            summaryEl.style.display = 'block';
+          } else if (w.summaryStatus === 'loading') {
+            summaryEl.textContent = '✨ Summarizing prompt...';
+            summaryEl.className = 'ai-summary loading';
+            summaryEl.style.display = 'block';
+          } else {
+            summaryEl.style.display = 'none';
           }
         }
 
