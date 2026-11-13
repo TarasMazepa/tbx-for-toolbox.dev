@@ -1058,6 +1058,44 @@ const HTML_APP = `<!DOCTYPE html>
       pointer-events: none;
       z-index: 1500;
     }
+    @keyframes connector-flow {
+      from { stroke-dashoffset: 0; }
+      to { stroke-dashoffset: 24; }
+    }
+    .connector-path-sending {
+      stroke-dasharray: 7 5;
+      animation: connector-flow 0.45s linear infinite;
+    }
+    button.dock-enter-btn.is-sending {
+      background: #0369a1;
+      border-color: #38bdf8;
+      box-shadow: 0 0 14px rgba(56, 189, 248, 0.7);
+      animation: none;
+    }
+    button.dock-enter-btn.is-sent {
+      background: #15803d;
+      border-color: #4ade80;
+      box-shadow: 0 0 18px rgba(74, 222, 128, 0.85);
+      animation: none;
+    }
+    button.dock-enter-btn.is-error {
+      background: #b91c1c;
+      border-color: #f87171;
+      box-shadow: 0 0 16px rgba(248, 113, 113, 0.85);
+      animation: none;
+    }
+    .spatial-window.is-sending .window-card {
+      border-color: #38bdf8 !important;
+      box-shadow: 0 0 18px rgba(56, 189, 248, 0.55);
+    }
+    .spatial-window.is-sent .window-card {
+      border-color: #4ade80 !important;
+      box-shadow: 0 0 22px rgba(74, 222, 128, 0.7);
+    }
+    .spatial-window.is-error .window-card {
+      border-color: #f87171 !important;
+      box-shadow: 0 0 18px rgba(248, 113, 113, 0.65);
+    }
   </style>
 </head>
 <body>
@@ -1340,19 +1378,106 @@ const HTML_APP = `<!DOCTYPE html>
         .replace(/'/g, '&#39;');
     }
 
+    const keyDispatchState = new Map();
+
+    function applyKeyDispatchUI(windowId) {
+      const stage = keyDispatchState.get(windowId)?.stage || null;
+      const card = spatialStage ? spatialStage.querySelector('.spatial-window[data-id="' + windowId + '"]') : null;
+      if (card) {
+        card.classList.remove('is-sending', 'is-sent', 'is-error');
+        if (stage === 'sending' || stage === 'started') card.classList.add('is-sending');
+        else if (stage === 'completed') card.classList.add('is-sent');
+        else if (stage === 'error') card.classList.add('is-error');
+      }
+
+      const btn = enterDock ? enterDock.querySelector('.dock-enter-btn[data-id="' + windowId + '"]') : null;
+      if (btn) {
+        btn.classList.remove('is-sending', 'is-sent', 'is-error');
+        const actionEl = btn.querySelector('.dock-btn-action');
+        if (stage === 'sending' || stage === 'started') {
+          btn.classList.add('is-sending');
+          if (actionEl) actionEl.textContent = stage === 'started' ? '⚡ Running...' : '⏳ Sending...';
+        } else if (stage === 'completed') {
+          btn.classList.add('is-sent');
+          if (actionEl) actionEl.textContent = '✓ Sent';
+        } else if (stage === 'error') {
+          btn.classList.add('is-error');
+          if (actionEl) actionEl.textContent = '✕ Failed';
+        } else if (actionEl) {
+          actionEl.textContent = activeAutoAccepts.has(windowId) ? '⚡ ACCEPTING...' : '↵';
+        }
+      }
+
+      const path = connectorLayer ? connectorLayer.querySelector('path[data-id="' + windowId + '"]') : null;
+      const dots = connectorLayer ? connectorLayer.querySelectorAll('circle[data-id="' + windowId + '"]') : [];
+      if (path) {
+        path.classList.toggle('connector-path-sending', stage === 'sending' || stage === 'started');
+        let overrideColor = null;
+        if (stage === 'sending' || stage === 'started') overrideColor = '#38bdf8';
+        else if (stage === 'completed') overrideColor = '#4ade80';
+        else if (stage === 'error') overrideColor = '#f87171';
+        if (overrideColor) {
+          path.setAttribute('stroke', overrideColor);
+          path.setAttribute('stroke-width', '3');
+          path.setAttribute('stroke-opacity', '1');
+          dots.forEach(d => {
+            d.setAttribute('fill', overrideColor);
+            d.setAttribute('fill-opacity', '1');
+          });
+        }
+      }
+    }
+
+    function setKeyDispatchStage(windowId, stage) {
+      const id = parseInt(windowId, 10);
+      const prev = keyDispatchState.get(id);
+      if (prev && prev.timer) clearTimeout(prev.timer);
+
+      if (!stage) {
+        keyDispatchState.delete(id);
+        applyKeyDispatchUI(id);
+        return;
+      }
+
+      let timer = null;
+      if (stage === 'completed' || stage === 'error') {
+        timer = setTimeout(() => {
+          keyDispatchState.delete(id);
+          if (currentWindows.length) renderSpatialLayout(currentWindows, currentDisplays);
+        }, stage === 'completed' ? 750 : 1200);
+      } else {
+        // Safety timeout in case server response/SSE is lost
+        timer = setTimeout(() => {
+          keyDispatchState.delete(id);
+          if (currentWindows.length) renderSpatialLayout(currentWindows, currentDisplays);
+        }, 4000);
+      }
+
+      keyDispatchState.set(id, { stage, timer });
+      applyKeyDispatchUI(id);
+    }
+
     // Send Key or Focus Action (with settlement debounce)
     async function sendAction(windowId, key) {
       if (isActionInProgress) return;
       isActionInProgress = true;
+      const id = parseInt(windowId, 10);
       triggerHaptic(key === 'enter' ? 24 : 12);
+      setKeyDispatchStage(id, 'sending');
       try {
-        await fetch('/api/key', {
+        const res = await fetch('/api/key', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ windowId: parseInt(windowId, 10), key })
+          body: JSON.stringify({ windowId: id, key })
         });
+        if (res.ok) {
+          setKeyDispatchStage(id, 'completed');
+        } else {
+          setKeyDispatchStage(id, 'error');
+        }
       } catch (err) {
         console.error('Failed to send key:', err);
+        setKeyDispatchStage(id, 'error');
       } finally {
         setTimeout(() => { isActionInProgress = false; }, 160);
       }
@@ -1383,24 +1508,32 @@ const HTML_APP = `<!DOCTYPE html>
         const x2 = bRect.left + bRect.width / 2;
         const y2 = bRect.top;
         const dy = Math.max(Math.abs(y2 - y1) * 0.5, 24);
+        const dispatchStage = keyDispatchState.get(w.id)?.stage || null;
+        const isSending = dispatchStage === 'sending' || dispatchStage === 'started';
         const isActionRequired = w.agyState && w.agyState.actionRequired;
-        const color = isActionRequired ? '#fbbf24' : (colorById.get(w.id) || '#38bdf8');
+        let color = isActionRequired ? '#fbbf24' : (colorById.get(w.id) || '#38bdf8');
+        if (isSending) color = '#38bdf8';
+        else if (dispatchStage === 'completed') color = '#4ade80';
+        else if (dispatchStage === 'error') color = '#f87171';
 
         const path = document.createElementNS(ns, 'path');
+        path.setAttribute('data-id', w.id);
         path.setAttribute('d', 'M ' + x1 + ' ' + y1 + ' C ' + x1 + ' ' + (y1 + dy) + ', ' + x2 + ' ' + (y2 - dy) + ', ' + x2 + ' ' + y2);
         path.setAttribute('fill', 'none');
         path.setAttribute('stroke', color);
-        path.setAttribute('stroke-width', isActionRequired ? '2.5' : '1.5');
-        path.setAttribute('stroke-opacity', isActionRequired ? '0.95' : '0.45');
+        path.setAttribute('stroke-width', (isActionRequired || dispatchStage) ? '3' : '1.5');
+        path.setAttribute('stroke-opacity', (isActionRequired || dispatchStage) ? '0.95' : '0.45');
+        if (isSending) path.setAttribute('class', 'connector-path-sending');
         connectorLayer.appendChild(path);
 
         [[x1, y1], [x2, y2]].forEach(([cx, cy]) => {
           const dot = document.createElementNS(ns, 'circle');
+          dot.setAttribute('data-id', w.id);
           dot.setAttribute('cx', cx);
           dot.setAttribute('cy', cy);
-          dot.setAttribute('r', isActionRequired ? '4' : '3');
+          dot.setAttribute('r', (isActionRequired || dispatchStage) ? '4' : '3');
           dot.setAttribute('fill', color);
-          dot.setAttribute('fill-opacity', isActionRequired ? '1' : '0.75');
+          dot.setAttribute('fill-opacity', (isActionRequired || dispatchStage) ? '1' : '0.75');
           connectorLayer.appendChild(dot);
         });
       });
@@ -1451,7 +1584,13 @@ const HTML_APP = `<!DOCTYPE html>
         }
 
         btn.style.setProperty('--win-color', color);
-        btn.className = 'dock-enter-btn' + (isActionRequired ? ' action-required' : '');
+        const dispatchStage = keyDispatchState.get(w.id)?.stage || null;
+        let btnClasses = 'dock-enter-btn';
+        if (isActionRequired) btnClasses += ' action-required';
+        if (dispatchStage === 'sending' || dispatchStage === 'started') btnClasses += ' is-sending';
+        else if (dispatchStage === 'completed') btnClasses += ' is-sent';
+        else if (dispatchStage === 'error') btnClasses += ' is-error';
+        btn.className = btnClasses;
         btn.title = w.name;
         const labelEl = btn.querySelector('.dock-btn-label');
         if (labelEl && labelEl.textContent !== shortName) {
@@ -1459,8 +1598,12 @@ const HTML_APP = `<!DOCTYPE html>
         }
         const actionEl = btn.querySelector('.dock-btn-action');
         if (actionEl) {
-          actionEl.textContent = isAccepting ? '⚡ ACCEPTING...' : '↵';
-          btn.style.background = isAccepting ? '#d97706' : '';
+          if (dispatchStage === 'sending') actionEl.textContent = '⏳ Sending...';
+          else if (dispatchStage === 'started') actionEl.textContent = '⚡ Running...';
+          else if (dispatchStage === 'completed') actionEl.textContent = '✓ Sent';
+          else if (dispatchStage === 'error') actionEl.textContent = '✕ Failed';
+          else actionEl.textContent = isAccepting ? '⚡ ACCEPTING...' : '↵';
+          btn.style.background = (!dispatchStage && isAccepting) ? '#d97706' : '';
         }
       });
     }
@@ -1629,10 +1772,14 @@ const HTML_APP = `<!DOCTYPE html>
           }
         }
 
-        // Update card classes (adds .action-required when snippet matches)
+        // Update card classes (adds .action-required when snippet matches + key dispatch state)
+        const dispatchStage = keyDispatchState.get(w.id)?.stage || null;
         let classNames = 'spatial-window';
         if (isActive) classNames += ' active';
         if (isActionRequired) classNames += ' action-required';
+        if (dispatchStage === 'sending' || dispatchStage === 'started') classNames += ' is-sending';
+        else if (dispatchStage === 'completed') classNames += ' is-sent';
+        else if (dispatchStage === 'error') classNames += ' is-error';
         card.className = classNames;
 
         card.style.setProperty('--win-color', colorById.get(w.id) || '#38bdf8');
@@ -1669,6 +1816,10 @@ const HTML_APP = `<!DOCTYPE html>
       evtSource.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+          if (data && data.type === 'key_status') {
+            setKeyDispatchStage(data.windowId, data.stage);
+            return;
+          }
           currentWindows = Array.isArray(data) ? data : (data && data.windows ? data.windows : []);
           currentDisplays = Array.isArray(data) ? [] : (data && data.displays ? data.displays : []);
           renderSpatialLayout(currentWindows, currentDisplays);
@@ -1763,6 +1914,8 @@ const server = http.createServer(async (req, res) => {
 
   // Endpoint: POST /api/key (Dispatch Keystroke & Restore Focus)
   if (url.pathname === '/api/key' && req.method === 'POST') {
+    let targetWindowId = null;
+    let targetKey = 'focus';
     try {
       const body = await readJsonBody(req);
       const { windowId, key } = body;
@@ -1773,13 +1926,26 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
+      targetWindowId = parseInt(windowId, 10);
+      targetKey = key || 'focus';
+      if (sseClients.size > 0) {
+        broadcast(JSON.stringify({ type: 'key_status', windowId: targetWindowId, key: targetKey, stage: 'started' }));
+      }
+
       const result = injectKey(windowId, key);
       const restored = result.restoredFocus ? ` (restored focus to ${result.frontAppName || 'window ' + result.prevWindowId})` : '';
       console.log(`[⌨️] Dispatched key "${key || 'focus'}" to window ${windowId}${restored}`);
 
+      if (sseClients.size > 0) {
+        broadcast(JSON.stringify({ type: 'key_status', windowId: targetWindowId, key: targetKey, stage: 'completed' }));
+      }
+
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(result));
     } catch (err) {
+      if (targetWindowId && sseClients.size > 0) {
+        broadcast(JSON.stringify({ type: 'key_status', windowId: targetWindowId, key: targetKey, stage: 'error', error: err.message }));
+      }
       console.error(`[!] Key dispatch error:`, err.message);
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: err.message }));
