@@ -697,6 +697,39 @@ const HTML_APP = `<!DOCTYPE html>
       display: none;
     }
 
+    /* Header Pill Button (overrides global keypad button sizing) */
+    button.header-btn {
+      flex: 0 0 auto;
+      min-height: 0;
+      padding: 3px 8px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      border-radius: 9999px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      color: var(--text);
+      gap: 4px;
+    }
+    button.header-btn.active {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: #082f49;
+    }
+    body.immersive header {
+      display: none;
+    }
+    .immersive-exit-btn {
+      display: none;
+      position: fixed;
+      top: calc(var(--safe-top) + 6px);
+      right: 8px;
+      z-index: 3000;
+      opacity: 0.75;
+    }
+    body.immersive .immersive-exit-btn {
+      display: flex;
+    }
+
     /* Spatial Viewport */
     .viewport-container {
       flex: 1 1 0;
@@ -1005,8 +1038,11 @@ const HTML_APP = `<!DOCTYPE html>
         <span id="statusText">Connecting</span>
       </div>
       <div class="status-badge" id="windowCount">0 windows</div>
+      <button type="button" class="header-btn" id="fullscreenBtn" title="Toggle fullscreen">⛶ Full</button>
     </div>
   </header>
+
+  <button type="button" class="header-btn immersive-exit-btn" id="immersiveExitBtn" title="Exit fullscreen">✕ Exit</button>
 
   <div class="viewport-container" id="viewportContainer">
     <div class="spatial-stage" id="spatialStage">
@@ -1025,6 +1061,61 @@ const HTML_APP = `<!DOCTYPE html>
     const spatialStage = document.getElementById('spatialStage');
     const autoAcceptToggle = document.getElementById('autoAcceptToggle');
     const enterOnlyToggle = document.getElementById('enterOnlyToggle');
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    const immersiveExitBtn = document.getElementById('immersiveExitBtn');
+
+    function isNativeFullscreen() {
+      return !!(document.fullscreenElement || document.webkitFullscreenElement);
+    }
+
+    function updateFullscreenUI() {
+      const active = isNativeFullscreen() || document.body.classList.contains('immersive');
+      if (fullscreenBtn) {
+        fullscreenBtn.classList.toggle('active', active);
+        fullscreenBtn.textContent = active ? '✕ Exit' : '⛶ Full';
+      }
+      if (typeof handleResize === 'function') {
+        requestAnimationFrame(handleResize);
+      }
+    }
+
+    async function toggleFullscreen() {
+      triggerHaptic(20);
+      const root = document.documentElement;
+      if (isNativeFullscreen()) {
+        try {
+          if (document.exitFullscreen) await document.exitFullscreen();
+          else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        } catch (e) {}
+        document.body.classList.remove('immersive');
+        updateFullscreenUI();
+        return;
+      }
+
+      if (document.body.classList.contains('immersive')) {
+        document.body.classList.remove('immersive');
+        updateFullscreenUI();
+        return;
+      }
+
+      if (root.requestFullscreen || root.webkitRequestFullscreen) {
+        try {
+          if (root.requestFullscreen) await root.requestFullscreen();
+          else root.webkitRequestFullscreen();
+          updateFullscreenUI();
+          return;
+        } catch (e) {}
+      }
+
+      // Fallback for browsers without Fullscreen API (e.g. iOS Safari)
+      document.body.classList.add('immersive');
+      updateFullscreenUI();
+    }
+
+    if (fullscreenBtn) fullscreenBtn.addEventListener('click', toggleFullscreen);
+    if (immersiveExitBtn) immersiveExitBtn.addEventListener('click', toggleFullscreen);
+    document.addEventListener('fullscreenchange', updateFullscreenUI);
+    document.addEventListener('webkitfullscreenchange', updateFullscreenUI);
 
     // Enter-Only toggle state (hides all buttons except Enter)
     let enterOnlyEnabled = localStorage.getItem('tbx_enter_only') === 'true';
