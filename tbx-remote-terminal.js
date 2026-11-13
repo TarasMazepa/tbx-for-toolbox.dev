@@ -626,60 +626,40 @@ const HTML_APP = `<!DOCTYPE html>
       box-shadow: 0 0 6px #22c55e;
     }
 
-    /* Auto-Accept Toggle Switch */
-    .auto-accept-container {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      cursor: pointer;
-      padding: 3px 8px;
+    /* Per-Terminal Auto-Accept Animation & Header Pill */
+    @keyframes pulse-auto-accept {
+      0%, 100% {
+        box-shadow: 0 0 8px rgba(245, 158, 11, 0.35), inset 0 0 6px rgba(245, 158, 11, 0.12);
+        border-color: #d97706;
+      }
+      50% {
+        box-shadow: 0 0 18px rgba(245, 158, 11, 0.8), inset 0 0 12px rgba(245, 158, 11, 0.25);
+        border-color: #fbbf24;
+      }
+    }
+    button.card-auto-btn {
+      flex: 0 0 auto;
+      min-height: 0;
+      padding: 2px 6px;
+      font-size: 0.62rem;
+      font-weight: 800;
+      border-radius: 4px;
       background: #0f172a;
-      border: 1px solid #1e293b;
-      border-radius: 9999px;
-      transition: border-color 0.2s, background 0.2s;
+      border: 1px solid #334155;
+      color: #64748b;
     }
-    .auto-accept-container:has(input:checked) {
+    button.card-auto-btn.active {
+      background: #451a03;
       border-color: #f59e0b;
-      background: #1c1808;
-    }
-    .auto-accept-label {
-      font-size: 0.68rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: #94a3b8;
-    }
-    .auto-accept-container:has(input:checked) .auto-accept-label {
       color: #fbbf24;
+      box-shadow: 0 0 8px rgba(245, 158, 11, 0.45);
     }
-    .auto-accept-container input {
-      display: none;
-    }
-    .auto-accept-switch {
-      position: relative;
-      width: 28px;
-      height: 16px;
-      background: #334155;
-      border-radius: 9999px;
-      transition: background 0.2s;
-      flex-shrink: 0;
-    }
-    .auto-accept-switch::after {
-      content: '';
-      position: absolute;
-      top: 2px;
-      left: 2px;
-      width: 12px;
-      height: 12px;
-      background: #ffffff;
-      border-radius: 50%;
-      transition: transform 0.2s;
-    }
-    .auto-accept-container input:checked + .auto-accept-switch {
-      background: #f59e0b;
-    }
-    .auto-accept-container input:checked + .auto-accept-switch::after {
-      transform: translateX(12px);
+    button.dock-enter-btn.auto-accept,
+    button.inline-enter-btn.auto-accept {
+      background: #1c1808;
+      border-color: #f59e0b;
+      color: #fbbf24;
+      animation: pulse-auto-accept 1.8s infinite ease-in-out;
     }
 
     /* Header Pill Button (overrides global keypad button sizing) */
@@ -1208,11 +1188,6 @@ const HTML_APP = `<!DOCTYPE html>
       <h1>Terminal Spatial Remote</h1>
     </div>
     <div class="header-info">
-      <label class="auto-accept-container" title="Automatically dispatch Enter when an action is required">
-        <span class="auto-accept-label">Auto-Accept</span>
-        <input type="checkbox" id="autoAcceptToggle">
-        <span class="auto-accept-switch"></span>
-      </label>
       <div class="status-badge" id="wakeLockBadge" title="Screen Wake Lock status (prevents screen dimming)">
         <div class="status-dot online" id="wakeDot"></div>
         <span id="wakeText">Awake</span>
@@ -1253,7 +1228,6 @@ const HTML_APP = `<!DOCTYPE html>
     const connectorLayer = document.getElementById('connectorLayer');
     const WINDOW_COLORS = ['#38bdf8', '#a78bfa', '#f472b6', '#34d399', '#fb923c', '#facc15', '#818cf8', '#2dd4bf'];
     let connectorTimer = null;
-    const autoAcceptToggle = document.getElementById('autoAcceptToggle');
     const workspaceMain = document.getElementById('workspaceMain');
     const dockPosBtn = document.getElementById('dockPosBtn');
     const fullscreenBtn = document.getElementById('fullscreenBtn');
@@ -1335,44 +1309,94 @@ const HTML_APP = `<!DOCTYPE html>
     document.addEventListener('fullscreenchange', updateFullscreenUI);
     document.addEventListener('webkitfullscreenchange', updateFullscreenUI);
 
-    // Auto-Accept toggle and execution state
-    let autoAcceptEnabled = localStorage.getItem('tbx_auto_accept') === 'true';
+    // Per-terminal Auto-Accept state (persisted in localStorage)
+    let savedAutoAcceptIds = [];
+    try {
+      const rawIds = JSON.parse(localStorage.getItem('tbx_auto_accept_ids') || '[]');
+      if (Array.isArray(rawIds)) savedAutoAcceptIds = rawIds.map(n => parseInt(n, 10)).filter(Boolean);
+    } catch (e) {}
+    const autoAcceptIds = new Set(savedAutoAcceptIds);
     const activeAutoAccepts = new Set();
 
-    if (autoAcceptToggle) {
-      autoAcceptToggle.checked = autoAcceptEnabled;
-      autoAcceptToggle.addEventListener('change', () => {
-        autoAcceptEnabled = autoAcceptToggle.checked;
-        localStorage.setItem('tbx_auto_accept', autoAcceptEnabled ? 'true' : 'false');
-        triggerHaptic(30);
-        if (!autoAcceptEnabled) {
-          activeAutoAccepts.clear();
-        } else if (currentWindows.length) {
-          checkAutoAccept(currentWindows);
+    function saveAutoAcceptIds() {
+      localStorage.setItem('tbx_auto_accept_ids', JSON.stringify([...autoAcceptIds]));
+    }
+
+    function toggleWindowAutoAccept(windowId) {
+      const id = parseInt(windowId, 10);
+      if (autoAcceptIds.has(id)) {
+        autoAcceptIds.delete(id);
+        activeAutoAccepts.delete(id);
+      } else {
+        autoAcceptIds.add(id);
+      }
+      saveAutoAcceptIds();
+      triggerHaptic(40);
+      if (currentWindows.length) {
+        renderSpatialLayout(currentWindows, currentDisplays);
+        checkAutoAccept(currentWindows);
+      }
+    }
+
+    function attachEnterHandlers(btn, windowId) {
+      let pressTimer = null;
+      let longPressed = false;
+      const clearPress = () => {
+        if (pressTimer) {
+          clearTimeout(pressTimer);
+          pressTimer = null;
         }
+      };
+      btn.addEventListener('pointerdown', (e) => {
+        if (e.button && e.button !== 0) return;
+        longPressed = false;
+        clearPress();
+        pressTimer = setTimeout(() => {
+          longPressed = true;
+          pressTimer = null;
+          toggleWindowAutoAccept(windowId);
+        }, 450);
+      });
+      btn.addEventListener('pointerup', clearPress);
+      btn.addEventListener('pointercancel', clearPress);
+      btn.addEventListener('pointerleave', clearPress);
+      btn.addEventListener('contextmenu', (e) => e.preventDefault());
+      btn.addEventListener('click', (e) => {
+        if (longPressed) {
+          e.preventDefault();
+          longPressed = false;
+          return;
+        }
+        sendAction(windowId, 'enter');
       });
     }
 
     function checkAutoAccept(windows) {
-      if (!autoAcceptEnabled) return;
-
       windows.forEach(w => {
+        if (!autoAcceptIds.has(w.id)) {
+          activeAutoAccepts.delete(w.id);
+          return;
+        }
         const isActionRequired = w.agyState && w.agyState.actionRequired;
         if (isActionRequired) {
           if (!activeAutoAccepts.has(w.id)) {
             activeAutoAccepts.add(w.id);
             console.log('[⚡ Auto-Accept] Action required on window ' + w.id + ' (' + w.name + '). Scheduling Enter...');
 
-            // Flash visual status on the dock Enter button
             const enterBtn = enterDock ? enterDock.querySelector('.dock-enter-btn[data-id="' + w.id + '"] .dock-btn-action') : null;
             if (enterBtn) {
               enterBtn.textContent = '⚡ ACCEPTING...';
               enterBtn.parentElement.style.background = '#d97706';
             }
+            const inlineBtn = spatialStage ? spatialStage.querySelector('.spatial-window[data-id="' + w.id + '"] .inline-enter-btn') : null;
+            if (inlineBtn) {
+              inlineBtn.textContent = '⚡ ACCEPTING...';
+              inlineBtn.style.background = '#d97706';
+            }
 
             // Settlement delay before auto-confirming (350ms)
             setTimeout(() => {
-              if (!autoAcceptEnabled) return;
+              if (!autoAcceptIds.has(w.id)) return;
               console.log('[⚡ Auto-Accept] Dispatched Enter to window ' + w.id);
               sendAction(w.id, 'enter');
             }, 350);
@@ -1522,6 +1546,8 @@ const HTML_APP = `<!DOCTYPE html>
 
         const inlineBtn = card.querySelector('.inline-enter-btn');
         if (inlineBtn) {
+          const isAutoAccept = autoAcceptIds.has(windowId);
+          inlineBtn.classList.toggle('auto-accept', isAutoAccept);
           inlineBtn.classList.remove('is-sending', 'is-sent', 'is-error');
           if (stage === 'sending' || stage === 'started') {
             inlineBtn.classList.add('is-sending');
@@ -1533,13 +1559,17 @@ const HTML_APP = `<!DOCTYPE html>
             inlineBtn.classList.add('is-error');
             inlineBtn.textContent = '✕ Failed';
           } else {
-            inlineBtn.textContent = activeAutoAccepts.has(windowId) ? '⚡ ACCEPTING...' : '↵ Enter';
+            inlineBtn.textContent = activeAutoAccepts.has(windowId)
+              ? '⚡ ACCEPTING...'
+              : (isAutoAccept ? '⚡ Auto' : '↵ Enter');
           }
         }
       }
 
       const btn = enterDock ? enterDock.querySelector('.dock-enter-btn[data-id="' + windowId + '"]') : null;
       if (btn) {
+        const isAutoAccept = autoAcceptIds.has(windowId);
+        btn.classList.toggle('auto-accept', isAutoAccept);
         btn.classList.remove('is-sending', 'is-sent', 'is-error');
         const actionEl = btn.querySelector('.dock-btn-action');
         if (stage === 'sending' || stage === 'started') {
@@ -1552,7 +1582,9 @@ const HTML_APP = `<!DOCTYPE html>
           btn.classList.add('is-error');
           if (actionEl) actionEl.textContent = '✕ Failed';
         } else if (actionEl) {
-          actionEl.textContent = activeAutoAccepts.has(windowId) ? '⚡ ACCEPTING...' : '↵';
+          actionEl.textContent = activeAutoAccepts.has(windowId)
+            ? '⚡ ACCEPTING...'
+            : (isAutoAccept ? '⚡ ↵' : '↵');
         }
       }
 
@@ -1746,7 +1778,7 @@ const HTML_APP = `<!DOCTYPE html>
         }
       }
 
-      sortedWindows.forEach(w => {
+      sortedWindows.forEach((w, idx) => {
         const shortName = getShortWindowLabel(w.name);
         const isActionRequired = !!(w.agyState && w.agyState.actionRequired);
         const isAccepting = activeAutoAccepts.has(w.id);
@@ -1758,22 +1790,26 @@ const HTML_APP = `<!DOCTYPE html>
           btn.type = 'button';
           btn.setAttribute('data-id', w.id);
           btn.className = 'dock-enter-btn';
-          btn.innerHTML = '<span class="dock-btn-label"></span><span class="dock-btn-action">↵ Enter</span>';
-          btn.addEventListener('click', () => sendAction(w.id, 'enter'));
+          btn.innerHTML = '<span class="dock-btn-label"></span><span class="dock-btn-action">↵</span>';
+          attachEnterHandlers(btn, w.id);
           enterDock.appendChild(btn);
-        } else {
-          enterDock.appendChild(btn);
+        } else if (enterDock.children[idx] !== btn) {
+          enterDock.insertBefore(btn, enterDock.children[idx] || null);
         }
 
         btn.style.setProperty('--win-color', color);
+        const isAutoAccept = autoAcceptIds.has(w.id);
         const dispatchStage = keyDispatchState.get(w.id)?.stage || null;
         let btnClasses = 'dock-enter-btn';
+        if (isAutoAccept) btnClasses += ' auto-accept';
         if (isActionRequired) btnClasses += ' action-required';
         if (dispatchStage === 'sending' || dispatchStage === 'started') btnClasses += ' is-sending';
         else if (dispatchStage === 'completed') btnClasses += ' is-sent';
         else if (dispatchStage === 'error') btnClasses += ' is-error';
-        btn.className = btnClasses;
-        btn.title = w.name;
+        if (btn.className !== btnClasses) {
+          btn.className = btnClasses;
+        }
+        btn.title = w.name + ' (long-press to toggle Auto-Accept)';
         const labelEl = btn.querySelector('.dock-btn-label');
         if (labelEl && labelEl.textContent !== shortName) {
           labelEl.textContent = shortName;
@@ -1784,7 +1820,7 @@ const HTML_APP = `<!DOCTYPE html>
           else if (dispatchStage === 'started') actionEl.textContent = '⚡ Running...';
           else if (dispatchStage === 'completed') actionEl.textContent = '✓ Sent';
           else if (dispatchStage === 'error') actionEl.textContent = '✕ Failed';
-          else actionEl.textContent = isAccepting ? '⚡ ACCEPTING...' : '↵';
+          else actionEl.textContent = isAccepting ? '⚡ ACCEPTING...' : (isAutoAccept ? '⚡ ↵' : '↵');
           btn.style.background = (!dispatchStage && isAccepting) ? '#d97706' : '';
         }
       });
@@ -1921,15 +1957,18 @@ const HTML_APP = `<!DOCTYPE html>
                 <span class="window-color-dot"></span>
                 <div class="window-title" title="\${escapeHtml(w.name)}">\${escapeHtml(w.name)}</div>
                 <div class="header-badges">
+                  <button type="button" class="card-auto-btn\${autoAcceptIds.has(w.id) ? ' active' : ''}" title="Toggle Auto-Accept for this terminal" onclick="event.stopPropagation(); toggleWindowAutoAccept(\${w.id})">⚡</button>
                   <span class="state-badge" style="display: none"></span>
                   <span class="active-badge" style="display: \${isActive ? 'inline-block' : 'none'}">ACTIVE</span>
                 </div>
               </div>
 
               <pre class="terminal-preview">\${escapeHtml(w.preview || '')}</pre>
-              <button type="button" class="inline-enter-btn" onclick="sendAction(\${w.id}, 'enter')">↵ Enter</button>
+              <button type="button" class="inline-enter-btn">↵ Enter</button>
             </div>
           \`;
+          const newInlineBtn = card.querySelector('.inline-enter-btn');
+          if (newInlineBtn) attachEnterHandlers(newInlineBtn, w.id);
           spatialStage.appendChild(card);
         } else {
           // Update in-place without tearing down DOM
@@ -1948,25 +1987,32 @@ const HTML_APP = `<!DOCTYPE html>
           if (previewEl && previewEl.textContent !== (w.preview || '')) {
             previewEl.textContent = w.preview || '';
           }
+        }
 
-          const inlineBtn = card.querySelector('.inline-enter-btn');
-          if (inlineBtn) {
-            const stage = keyDispatchState.get(w.id)?.stage || null;
-            inlineBtn.classList.remove('is-sending', 'is-sent', 'is-error');
-            if (stage === 'sending' || stage === 'started') {
-              inlineBtn.classList.add('is-sending');
-              inlineBtn.textContent = stage === 'started' ? '⚡ Running...' : '⏳ Sending...';
-            } else if (stage === 'completed') {
-              inlineBtn.classList.add('is-sent');
-              inlineBtn.textContent = '✓ Sent';
-            } else if (stage === 'error') {
-              inlineBtn.classList.add('is-error');
-              inlineBtn.textContent = '✕ Failed';
-            } else {
-              const isAccepting = activeAutoAccepts.has(w.id);
-              inlineBtn.textContent = isAccepting ? '⚡ ACCEPTING...' : '↵ Enter';
-              inlineBtn.style.background = isAccepting ? '#d97706' : '';
-            }
+        const autoBtn = card.querySelector('.card-auto-btn');
+        if (autoBtn) {
+          autoBtn.classList.toggle('active', autoAcceptIds.has(w.id));
+        }
+
+        const inlineBtn = card.querySelector('.inline-enter-btn');
+        if (inlineBtn) {
+          const isAutoAccept = autoAcceptIds.has(w.id);
+          const stage = keyDispatchState.get(w.id)?.stage || null;
+          inlineBtn.classList.toggle('auto-accept', isAutoAccept);
+          inlineBtn.classList.remove('is-sending', 'is-sent', 'is-error');
+          if (stage === 'sending' || stage === 'started') {
+            inlineBtn.classList.add('is-sending');
+            inlineBtn.textContent = stage === 'started' ? '⚡ Running...' : '⏳ Sending...';
+          } else if (stage === 'completed') {
+            inlineBtn.classList.add('is-sent');
+            inlineBtn.textContent = '✓ Sent';
+          } else if (stage === 'error') {
+            inlineBtn.classList.add('is-error');
+            inlineBtn.textContent = '✕ Failed';
+          } else {
+            const isAccepting = activeAutoAccepts.has(w.id);
+            inlineBtn.textContent = isAccepting ? '⚡ ACCEPTING...' : (isAutoAccept ? '⚡ Auto' : '↵ Enter');
+            inlineBtn.style.background = isAccepting ? '#d97706' : '';
           }
         }
 
