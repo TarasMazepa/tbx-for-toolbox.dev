@@ -1270,21 +1270,9 @@ const HTML_APP = `<!DOCTYPE html>
       const viewW = Math.max(rect.width - padding * 2, 40);
       const viewH = Math.max(rect.height - padding * 2, 40);
 
-      // Pure "contain" mode: fit desktop aspect ratio cleanly inside available viewport
-      const desktopAspect = spanX / spanY;
-      const viewAspect = viewW / viewH;
-
-      let stageW, stageH;
-      if (viewAspect > desktopAspect) {
-        stageH = viewH;
-        stageW = viewH * desktopAspect;
-      } else {
-        stageW = viewW;
-        stageH = viewW / desktopAspect;
-      }
-
-      spatialStage.style.width = Math.round(stageW) + 'px';
-      spatialStage.style.height = Math.round(stageH) + 'px';
+      // Stretch to fill the entire available viewport for maximum text readability
+      spatialStage.style.width = Math.round(viewW) + 'px';
+      spatialStage.style.height = Math.round(viewH) + 'px';
 
       // Render monitor outline layer behind windows when multiple displays exist
       let monitorsLayer = spatialStage.querySelector('.monitors-layer');
