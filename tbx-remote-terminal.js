@@ -189,13 +189,14 @@ const JXA_FETCH_SCRIPT = `
   if (!terminal.running()) return JSON.stringify({ windows: [], displays: displays });
   
   const wins = terminal.windows;
-  let ids = [], names = [], positions = [], sizes = [], indices = [];
+  let ids = [], names = [], positions = [], sizes = [], indices = [], miniaturized = [];
   try {
     ids = wins.id();
     names = wins.name();
     positions = wins.position();
     sizes = wins.size();
     indices = wins.index();
+    try { miniaturized = wins.miniaturized(); } catch(e) {}
   } catch(e) {
     return JSON.stringify({ windows: [], displays: displays });
   }
@@ -205,7 +206,7 @@ const JXA_FETCH_SCRIPT = `
   // 2. Query System Events for true global desktop coordinates across multi-monitor setups.
   // Note: Terminal.app's internal AppleScript dictionary has an upstream bug where positions[i].y
   // is clamped to the local screen menu bar offset (y ≈ 30-33) instead of global desktop Y.
-  let sysPositions = [], sysSizes = [], sysNames = [];
+  let sysPositions = [], sysSizes = [], sysNames = [], sysMinimized = [];
   try {
     const sys = Application("System Events");
     const termProc = sys.processes.byName("Terminal");
@@ -213,11 +214,28 @@ const JXA_FETCH_SCRIPT = `
       sysNames = termProc.windows.name();
       sysPositions = termProc.windows.position();
       sysSizes = termProc.windows.size();
+      try {
+        sysMinimized = termProc.windows.attributes.byName("AXMinimized").value();
+      } catch(e) {}
     }
   } catch(e) {}
+
+  const sysVisible = [];
+  if (sysNames && sysNames.length) {
+    for (let k = 0; k < sysNames.length; k++) {
+      if (sysMinimized && sysMinimized[k] === true) continue;
+      sysVisible.push({
+        name: sysNames[k],
+        pos: sysPositions[k],
+        size: sysSizes[k],
+        used: false
+      });
+    }
+  }
   
   const results = [];
   for (let i = 0; i < ids.length; i++) {
+    if (miniaturized && miniaturized[i] === true) continue;
     const id = ids[i];
     const name = names[i];
     if (!id || !name) continue;
@@ -227,16 +245,18 @@ const JXA_FETCH_SCRIPT = `
     let sizeW = Math.round(sizes[i].x);
     let sizeH = Math.round(sizes[i].y);
 
-    if (sysNames && sysNames.length) {
-      let sysIdx = sysNames.indexOf(name);
-      if (sysIdx === -1 && i < sysPositions.length) sysIdx = i;
-      if (sysIdx >= 0 && sysPositions[sysIdx] && Array.isArray(sysPositions[sysIdx])) {
-        posX = Math.round(sysPositions[sysIdx][0]);
-        posY = Math.round(sysPositions[sysIdx][1]);
-      }
-      if (sysIdx >= 0 && sysSizes[sysIdx] && Array.isArray(sysSizes[sysIdx])) {
-        sizeW = Math.round(sysSizes[sysIdx][0]);
-        sizeH = Math.round(sysSizes[sysIdx][1]);
+    if (sysVisible.length) {
+      let sysMatch = sysVisible.find(s => !s.used && s.name === name);
+      if (sysMatch) {
+        sysMatch.used = true;
+        if (sysMatch.pos && Array.isArray(sysMatch.pos)) {
+          posX = Math.round(sysMatch.pos[0]);
+          posY = Math.round(sysMatch.pos[1]);
+        }
+        if (sysMatch.size && Array.isArray(sysMatch.size)) {
+          sizeW = Math.round(sysMatch.size[0]);
+          sizeH = Math.round(sysMatch.size[1]);
+        }
       }
     }
     
@@ -326,7 +346,7 @@ function fetchTerminalState() {
     const rawWindows = Array.isArray(parsed) ? parsed : (parsed && parsed.windows ? parsed.windows : []);
     const displays = Array.isArray(parsed) ? [] : (parsed && parsed.displays ? parsed.displays : []);
 
-    if (Array.isArray(rawWindows) && rawWindows.length > 0) {
+    if (Array.isArray(rawWindows)) {
       const enriched = rawWindows.map(w => {
         const agyState = detectAgyState(w.name, w.analysis || w.preview, w.cols);
         return {
@@ -377,7 +397,10 @@ function injectKey(windowId, key) {
       const frontApp = sys.processes.whose({ frontmost: true })[0];
       frontAppName = frontApp ? frontApp.name() : null;
       if (terminal.running() && terminal.windows.length > 0) {
-        prevWindowId = terminal.windows[0].id();
+        const visibleWins = terminal.windows.whose({ miniaturized: false });
+        if (visibleWins.length > 0) {
+          prevWindowId = visibleWins[0].id();
+        }
       }
     } catch(e) {}
 
