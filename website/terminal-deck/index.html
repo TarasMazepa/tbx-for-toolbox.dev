@@ -231,6 +231,15 @@
       transition: border-color 0.25s, box-shadow 0.25s, background 0.25s;
       overflow: hidden;
     }
+    .window-content {
+      order: 1;
+      flex: 1 1 0;
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
 
     /* Focused Window State */
     .spatial-window.active .window-card {
@@ -546,7 +555,8 @@
       gap: 4px;
       border-top: none;
     }
-    .workspace-main[data-dock="inline"] .enter-dock {
+    .workspace-main[data-dock="inline"] .enter-dock,
+    .workspace-main[data-dock="edge"] .enter-dock {
       display: none;
     }
     .workspace-main[data-dock="left"] .enter-dock {
@@ -612,8 +622,52 @@
       font-weight: 800;
       min-height: clamp(32px, 4vh, 42px);
     }
-    .workspace-main[data-dock="inline"] button.inline-enter-btn {
+    .workspace-main[data-dock="inline"] button.inline-enter-btn,
+    .workspace-main[data-dock="edge"] button.inline-enter-btn {
       display: flex;
+    }
+    .workspace-main[data-dock="edge"] .spatial-window[data-enter-side="top"] .window-card {
+      flex-direction: column;
+    }
+    .workspace-main[data-dock="edge"] .spatial-window[data-enter-side="top"] button.inline-enter-btn {
+      order: 0;
+      width: 100%;
+      min-height: clamp(28px, 18%, 48px);
+      margin-top: 0;
+      margin-bottom: 4px;
+    }
+    .workspace-main[data-dock="edge"] .spatial-window[data-enter-side="bottom"] .window-card {
+      flex-direction: column;
+    }
+    .workspace-main[data-dock="edge"] .spatial-window[data-enter-side="bottom"] button.inline-enter-btn {
+      order: 2;
+      width: 100%;
+      min-height: clamp(28px, 18%, 48px);
+      margin-top: 4px;
+    }
+    .workspace-main[data-dock="edge"] .spatial-window[data-enter-side="left"] .window-card,
+    .workspace-main[data-dock="edge"] .spatial-window[data-enter-side="right"] .window-card {
+      flex-direction: row;
+    }
+    .workspace-main[data-dock="edge"] .spatial-window[data-enter-side="left"] button.inline-enter-btn,
+    .workspace-main[data-dock="edge"] .spatial-window[data-enter-side="right"] button.inline-enter-btn {
+      width: clamp(44px, 22%, 76px);
+      height: 100%;
+      min-height: 0;
+      margin-top: 0;
+      padding: 6px 4px;
+      font-size: clamp(0.68rem, 1.25vw, 0.9rem);
+      text-align: center;
+      white-space: normal;
+      line-height: 1.15;
+    }
+    .workspace-main[data-dock="edge"] .spatial-window[data-enter-side="left"] button.inline-enter-btn {
+      order: 0;
+      margin-right: 4px;
+    }
+    .workspace-main[data-dock="edge"] .spatial-window[data-enter-side="right"] button.inline-enter-btn {
+      order: 2;
+      margin-left: 4px;
     }
     .spatial-window.action-required button.inline-enter-btn {
       background: var(--enter-btn);
@@ -785,10 +839,14 @@
     const fullscreenBtn = document.getElementById('fullscreenBtn');
     const immersiveExitBtn = document.getElementById('immersiveExitBtn');
 
-    const DOCK_POSITIONS = ['bottom', 'top', 'left', 'right', 'inline'];
-    const DOCK_LABELS = { bottom: '⬇ Bottom', top: '⬆ Top', left: '⬅ Left', right: '➡ Right', inline: '▣ Inline' };
+    const DOCK_POSITIONS = ['bottom', 'top', 'left', 'right', 'inline', 'edge'];
+    const DOCK_LABELS = { bottom: '⬇ Bottom', top: '⬆ Top', left: '⬅ Left', right: '➡ Right', inline: '▣ Inline', edge: '◫ Edge' };
     let dockPos = localStorage.getItem('tbx_dock_pos');
     if (!DOCK_POSITIONS.includes(dockPos)) dockPos = 'bottom';
+
+    function isPerWindowDock(pos) {
+      return pos === 'inline' || pos === 'edge';
+    }
 
     function applyDockPosition() {
       if (workspaceMain) workspaceMain.setAttribute('data-dock', dockPos);
@@ -1232,7 +1290,7 @@
     function drawConnectors(windows, colorById) {
       if (!connectorLayer) return;
       connectorLayer.innerHTML = '';
-      if (!windows || !windows.length || dockPos === 'inline') return;
+      if (!windows || !windows.length || isPerWindowDock(dockPos)) return;
 
       const ns = 'http://www.w3.org/2000/svg';
       windows.forEach(w => {
@@ -1313,7 +1371,7 @@
 
     function renderEnterDock(sortedWindows, colorById) {
       if (!enterDock) return;
-      if (!sortedWindows.length || dockPos === 'inline') {
+      if (!sortedWindows.length || isPerWindowDock(dockPos)) {
         enterDock.innerHTML = '';
         return;
       }
@@ -1483,6 +1541,30 @@
         }
       }
 
+      function pickNearestEnterSide(leftPct, topPct, widthPct, heightPct) {
+        const cardW = (widthPct / 100) * viewW;
+        const cardH = (heightPct / 100) * viewH;
+        const distTop = (topPct / 100) * viewH;
+        const distBottom = ((100 - topPct - heightPct) / 100) * viewH;
+        const distLeft = (leftPct / 100) * viewW;
+        const distRight = ((100 - leftPct - widthPct) / 100) * viewW;
+
+        if (Math.abs(cardW - cardH) < 1) {
+          const sides = [
+            ['top', distTop],
+            ['bottom', distBottom],
+            ['left', distLeft],
+            ['right', distRight],
+          ];
+          sides.sort((a, b) => a[1] - b[1]);
+          return sides[0][0];
+        }
+        if (cardH > cardW) {
+          return distTop <= distBottom ? 'top' : 'bottom';
+        }
+        return distLeft <= distRight ? 'left' : 'right';
+      }
+
       // Reconcile and update cards in place
       windows.forEach(w => {
         const leftPercent = ((w.position.x - minX) / spanX) * 100;
@@ -1505,17 +1587,19 @@
           card.className = 'spatial-window';
           card.innerHTML = `
             <div class="window-card">
-              <div class="card-header" onclick="sendAction(${w.id}, 'focus')">
-                <span class="window-color-dot"></span>
-                <div class="window-title" title="${escapeHtml(w.name)}">${escapeHtml(w.name)}</div>
-                <div class="header-badges">
-                  <button type="button" class="card-auto-btn${autoAcceptIds.has(w.id) ? ' active' : ''}" title="Toggle Auto-Accept for this terminal" onclick="event.stopPropagation(); toggleWindowAutoAccept(${w.id})">⚡</button>
-                  <span class="state-badge" style="display: none"></span>
-                  <span class="active-badge" style="display: ${isActive ? 'inline-block' : 'none'}">ACTIVE</span>
+              <div class="window-content">
+                <div class="card-header" onclick="sendAction(${w.id}, 'focus')">
+                  <span class="window-color-dot"></span>
+                  <div class="window-title" title="${escapeHtml(w.name)}">${escapeHtml(w.name)}</div>
+                  <div class="header-badges">
+                    <button type="button" class="card-auto-btn${autoAcceptIds.has(w.id) ? ' active' : ''}" title="Toggle Auto-Accept for this terminal" onclick="event.stopPropagation(); toggleWindowAutoAccept(${w.id})">⚡</button>
+                    <span class="state-badge" style="display: none"></span>
+                    <span class="active-badge" style="display: ${isActive ? 'inline-block' : 'none'}">ACTIVE</span>
+                  </div>
                 </div>
-              </div>
 
-              <pre class="terminal-preview">${escapeHtml(w.preview || '')}</pre>
+                <pre class="terminal-preview">${escapeHtml(w.preview || '')}</pre>
+              </div>
               <button type="button" class="inline-enter-btn">↵ Enter</button>
             </div>
           `;
@@ -1540,6 +1624,8 @@
             previewEl.textContent = w.preview || '';
           }
         }
+
+        card.setAttribute('data-enter-side', pickNearestEnterSide(leftPercent, topPercent, widthPercent, heightPercent));
 
         const autoBtn = card.querySelector('.card-auto-btn');
         if (autoBtn) {
