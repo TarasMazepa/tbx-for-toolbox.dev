@@ -6,6 +6,14 @@ Exploratory scratchpad for backlog ideas, investigative spikes, architectural in
 
 ## Active ToLooks
 
+- [ ] **5. Publish `tbx` Scripts to Homebrew with `tbx <command>` Dispatcher**
+  - **Idea**: Distribute `tbx` scripts via Homebrew (e.g. `brew install TarasMazepa/tbx/tbx` or `homebrew-tap`) and provide a `tbx` entrypoint so users can run `tbx <command>` (mapping to `tbx-<command>.sh` or `tbx-<command>.js`, e.g. `tbx terminal-deck`, `tbx gh-status`).
+  - **Context**: Currently scripts live in the repo root as `tbx-*.sh` and `tbx-*.js` and require cloning the repo or adding it to `PATH`. A `tbx` dispatcher + Homebrew formula makes them installable globally in one command and also gives a clean `npx`-free command (e.g. `tbx terminal-deck`) to reference in the Terminal Deck onboarding UI.
+  - **Investigation**:
+    - [ ] Design a lightweight `tbx` dispatcher script that lists available `tbx-*` commands, forwards arguments to `tbx-<command>.sh` / `tbx-<command>.js`, and handles `tbx --help` / `tbx <command> --help`.
+    - [ ] Verify relative resource paths work when installed in Homebrew's `libexec` / `share` (e.g. [`tbx-terminal-deck.js`](tbx-terminal-deck.js) reading `website/terminal-deck/index.html`, and `tbx-*.sh` scripts invoked from any directory).
+    - [ ] Set up a Homebrew formula / tap and release automation (e.g. GitHub Actions updating the formula on tag/release).
+
 - [ ] **4. Host Terminal Deck Webpage on `toolbox.dev` Website**
   - **Idea**: Host the Terminal Deck web controller under `website/terminal-deck/` alongside `website/bookmarklets`, `website/envelope-printer`, and `website/infinity-note`, and link it from [`website/index.html`](website/index.html).
   - **Context**: Currently [`tbx-terminal-deck.js`](tbx-terminal-deck.js) serves both the HTML UI and the local API/SSE endpoints over plain HTTP (`http://<ip>:8999`). Hosting the UI on `toolbox.dev` (HTTPS) gives a stable URL, matches the rest of the toolbox web apps, and enables native `navigator.wakeLock` support.
