@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * tbx-remote-terminal.js
+ * tbx-terminal-deck.js
  *
  * All-in-one macOS Terminal Remote Controller & Reactive Daemon.
  * - Focus settlement delay (80ms before key, 60ms before focus restore)
@@ -479,7 +479,7 @@ function computeStateHash(state) {
     size: w.size,
     status: w.agyState ? w.agyState.status : 'idle',
     actionRequired: w.agyState ? w.agyState.actionRequired : false,
-    preview: w.name.includes('tbx-remote-terminal') ? '' : w.preview
+    preview: w.name.includes('tbx-terminal-deck') ? '' : w.preview
   }));
   return crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
 }
@@ -2231,68 +2231,74 @@ function pollAndBroadcast() {
   }
 }
 
-// Periodic background change detection
-const checkTimer = setInterval(pollAndBroadcast, POLL_INTERVAL_MS);
+module.exports = {
+  detectAgyState,
+};
 
-// Heartbeat keep-alive every 15s to keep connections healthy
-const heartbeatTimer = setInterval(() => {
-  for (const res of sseClients) {
-    try {
-      res.write(': keepalive\n\n');
-    } catch (e) {
-      sseClients.delete(res);
+if (require.main === module) {
+  // Periodic background change detection
+  const checkTimer = setInterval(pollAndBroadcast, POLL_INTERVAL_MS);
+
+  // Heartbeat keep-alive every 15s to keep connections healthy
+  const heartbeatTimer = setInterval(() => {
+    for (const res of sseClients) {
+      try {
+        res.write(': keepalive\n\n');
+      } catch (e) {
+        sseClients.delete(res);
+      }
     }
-  }
-}, 15000);
+  }, 15000);
 
-// Start server
-server.listen(PORT, '0.0.0.0', () => {
-  const localIp = getLocalIp();
-  const hostname = os.hostname();
-  const phoneUrl = `http://${localIp}:${PORT}`;
+  // Start server
+  server.listen(PORT, '0.0.0.0', () => {
+    const localIp = getLocalIp();
+    const hostname = os.hostname();
+    const phoneUrl = `http://${localIp}:${PORT}`;
 
-  console.log(`\n======================================================`);
-  console.log(`🚀 macOS Terminal Spatial Remote running on port ${PORT}`);
-  console.log(`======================================================`);
-  console.log(`Local Web App:    http://localhost:${PORT}`);
-  console.log(`Phone (LAN Wi-Fi): ${phoneUrl}`);
-  console.log(`mDNS Link:        http://${hostname}:${PORT}`);
-  console.log(`\nScan with Phone Camera to Open Spatial Controller:`);
-  printQrCode(phoneUrl);
-  console.log(`======================================================`);
-  console.log(`Keep-Awake:`);
-  console.log(`  • Web Controller: Screen Wake Lock API + Auto Re-arm Active`);
-  console.log(`======================================================`);
-  console.log(`Endpoints:`);
-  console.log(`  • GET  /          -> 100% Spatial Multi-Monitor Controller`);
-  console.log(`  • GET  /terminals -> JSON snapshot of open windows`);
-  console.log(`  • GET  /events    -> Real-time SSE reactive stream`);
-  console.log(`  • POST /api/key   -> Focus window & inject keystroke`);
-  console.log(`======================================================\n`);
-});
+    console.log(`\n======================================================`);
+    console.log(`🚀 macOS Terminal Spatial Remote running on port ${PORT}`);
+    console.log(`======================================================`);
+    console.log(`Local Web App:    http://localhost:${PORT}`);
+    console.log(`Phone (LAN Wi-Fi): ${phoneUrl}`);
+    console.log(`mDNS Link:        http://${hostname}:${PORT}`);
+    console.log(`\nScan with Phone Camera to Open Spatial Controller:`);
+    printQrCode(phoneUrl);
+    console.log(`======================================================`);
+    console.log(`Keep-Awake:`);
+    console.log(`  • Web Controller: Screen Wake Lock API + Auto Re-arm Active`);
+    console.log(`======================================================`);
+    console.log(`Endpoints:`);
+    console.log(`  • GET  /          -> 100% Spatial Multi-Monitor Controller`);
+    console.log(`  • GET  /terminals -> JSON snapshot of open windows`);
+    console.log(`  • GET  /events    -> Real-time SSE reactive stream`);
+    console.log(`  • POST /api/key   -> Focus window & inject keystroke`);
+    console.log(`======================================================\n`);
+  });
 
-// Clean and instant shutdown on Ctrl+C (SIGINT) or SIGTERM
-function shutdown() {
-  console.log('\nShutting down server...');
-  clearInterval(checkTimer);
-  clearInterval(heartbeatTimer);
+  // Clean and instant shutdown on Ctrl+C (SIGINT) or SIGTERM
+  function shutdown() {
+    console.log('\nShutting down server...');
+    clearInterval(checkTimer);
+    clearInterval(heartbeatTimer);
 
-  for (const res of sseClients) {
+    for (const res of sseClients) {
+      try {
+        res.end();
+        res.destroy();
+      } catch (e) {}
+    }
+    sseClients.clear();
+
     try {
-      res.end();
-      res.destroy();
+      server.closeAllConnections?.();
+      server.close();
     } catch (e) {}
+
+    process.exit(0);
   }
-  sseClients.clear();
 
-  try {
-    server.closeAllConnections?.();
-    server.close();
-  } catch (e) {}
-
-  process.exit(0);
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
+  process.on('SIGHUP', shutdown);
 }
-
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
-process.on('SIGHUP', shutdown);
