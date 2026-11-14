@@ -417,16 +417,35 @@ function injectKey(windowId, key) {
       terminal.windows.byId(${windowId}).index = 1;
     } catch(e) {}
 
+    let focusConfirmed = false;
     ${code !== null ? `
-    // 2. Allow macOS Window Server to settle focus on target window before keystroke
-    delay(0.08);
+    // 2. Poll until Terminal is frontmost and target window is index 1 (up to 500ms)
+    for (let attempt = 0; attempt < 20; attempt++) {
+      try {
+        const curFront = sys.processes.whose({ frontmost: true })[0];
+        const curFrontName = curFront ? curFront.name() : null;
+        const targetWin = terminal.windows.byId(${windowId});
+        if (curFrontName === "Terminal" && targetWin && targetWin.index() === 1) {
+          focusConfirmed = true;
+          break;
+        }
+        terminal.activate();
+        targetWin.index = 1;
+      } catch(e) {}
+      delay(0.025);
+    }
 
-    // 3. Dispatch keystroke
-    sys.keyCode(${code});
+    if (focusConfirmed) {
+      // Allow macOS Window Server to settle focus on target window before keystroke
+      delay(0.12);
 
-    // 4. Brief pause to ensure the key event is queued/consumed before focus switch
-    delay(0.06);
-    ` : ''}
+      // 3. Dispatch keystroke
+      sys.keyCode(${code});
+
+      // 4. Brief pause to ensure the key event is queued/consumed before focus switch
+      delay(0.08);
+    }
+    ` : 'focusConfirmed = true;'}
 
     // 5. Automatically restore focus back if this was a keystroke (not an explicit focus request)
     ${!isExplicitFocus ? `
@@ -441,7 +460,8 @@ function injectKey(windowId, key) {
     ` : ''}
 
     JSON.stringify({
-      success: true,
+      success: focusConfirmed,
+      error: focusConfirmed ? null : "Target window did not gain focus before keystroke",
       windowId: ${windowId},
       key: "${normalizedKey}",
       frontAppName: frontAppName,
@@ -456,7 +476,11 @@ function injectKey(windowId, key) {
     timeout: 3000
   });
 
-  return JSON.parse(out.trim());
+  const parsed = JSON.parse(out.trim());
+  if (!parsed.success) {
+    throw new Error(parsed.error || `Failed to focus window ${windowId}`);
+  }
+  return parsed;
 }
 
 /**
