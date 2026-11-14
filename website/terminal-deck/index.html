@@ -773,6 +773,72 @@
       border-color: #f87171 !important;
       box-shadow: 0 0 18px rgba(248, 113, 113, 0.65);
     }
+    .qr-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 23, 0.8);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 3000;
+    }
+    .qr-modal-backdrop[hidden] {
+      display: none;
+    }
+    .qr-modal {
+      max-width: 340px;
+      width: 100%;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 20px;
+      text-align: center;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+    }
+    .qr-modal h2 {
+      margin: 0 0 6px 0;
+      font-size: 1.05rem;
+      color: var(--accent);
+    }
+    .qr-modal p {
+      margin: 0 0 14px 0;
+      font-size: 0.84rem;
+      color: var(--text-muted);
+      line-height: 1.45;
+    }
+    .qr-img-wrap {
+      display: inline-block;
+      background: #ffffff;
+      padding: 10px;
+      border-radius: 10px;
+      margin-bottom: 12px;
+    }
+    .qr-img-wrap img {
+      display: block;
+      width: 200px;
+      height: 200px;
+    }
+    .qr-url-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      background: #020617;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 6px 10px;
+      margin-bottom: 14px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.78rem;
+      color: #e2e8f0;
+    }
+    .qr-url-row span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
   </style>
 </head>
 <body>
@@ -791,6 +857,7 @@
         <span id="statusText">Connecting</span>
       </div>
       <div class="status-badge" id="windowCount">0 windows</div>
+      <button type="button" class="header-btn" id="qrBtn" title="Show mobile QR code">📱 QR</button>
       <button type="button" class="header-btn" id="dockPosBtn" title="Move Enter dock (Bottom / Top / Left / Right)">⬇ Bottom</button>
       <button type="button" class="header-btn" id="fullscreenBtn" title="Toggle fullscreen">⛶ Full</button>
     </div>
@@ -808,6 +875,21 @@
     <div class="enter-dock" id="enterDock"></div>
   </main>
   <svg class="connector-layer" id="connectorLayer"></svg>
+
+  <div class="qr-modal-backdrop" id="qrModal" hidden>
+    <div class="qr-modal" role="dialog" aria-modal="true" aria-labelledby="qrModalTitle">
+      <h2 id="qrModalTitle">📱 Open on Mobile</h2>
+      <p>Scan this QR code with your phone camera on the same Wi-Fi to control your terminals:</p>
+      <div class="qr-img-wrap">
+        <img id="qrImg" alt="Mobile QR Code">
+      </div>
+      <div class="qr-url-row">
+        <span id="qrUrlText">Loading...</span>
+        <button type="button" class="header-btn" id="qrCopyBtn">Copy</button>
+      </div>
+      <button type="button" class="header-btn" id="qrCloseBtn">Continue on Desktop</button>
+    </div>
+  </div>
 
   <script>
     const urlParams = new URLSearchParams(window.location.search);
@@ -1815,6 +1897,57 @@
     }
 
     connectSSE();
+
+    // Mobile QR modal
+    const qrBtn = document.getElementById('qrBtn');
+    const qrModal = document.getElementById('qrModal');
+    const qrImg = document.getElementById('qrImg');
+    const qrUrlText = document.getElementById('qrUrlText');
+    const qrCopyBtn = document.getElementById('qrCopyBtn');
+    const qrCloseBtn = document.getElementById('qrCloseBtn');
+
+    async function openQrModal() {
+      if (!qrModal || !qrImg) return;
+      qrImg.src = `${apiBase}/qr.svg?t=${Date.now()}`;
+      qrModal.hidden = false;
+      try {
+        const res = await fetch(`${apiBase}/info`);
+        if (res.ok) {
+          const info = await res.json();
+          if (qrUrlText) qrUrlText.textContent = info.phoneUrl || info.localUrl;
+        }
+      } catch (e) {
+        if (qrUrlText) qrUrlText.textContent = 'Daemon unavailable';
+      }
+    }
+
+    function closeQrModal() {
+      if (qrModal) qrModal.hidden = true;
+    }
+
+    if (qrBtn) qrBtn.addEventListener('click', openQrModal);
+    if (qrCloseBtn) qrCloseBtn.addEventListener('click', closeQrModal);
+    if (qrModal) {
+      qrModal.addEventListener('click', (e) => {
+        if (e.target === qrModal) closeQrModal();
+      });
+    }
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && qrModal && !qrModal.hidden) closeQrModal();
+    });
+    if (qrCopyBtn && qrUrlText) {
+      qrCopyBtn.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(qrUrlText.textContent);
+          qrCopyBtn.textContent = 'Copied!';
+          setTimeout(() => { qrCopyBtn.textContent = 'Copy'; }, 1500);
+        } catch (e) {}
+      });
+    }
+
+    if (urlParams.get('qr') === '1' && !isMobileDevice()) {
+      openQrModal();
+    }
   </script>
 </body>
 </html>

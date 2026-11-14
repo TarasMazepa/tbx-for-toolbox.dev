@@ -29,9 +29,9 @@ Exploratory scratchpad for backlog ideas, investigative spikes, architectural in
     - [x] Host [`website/terminal-deck/index.html`](website/terminal-deck/index.html) and link it from [`website/index.html`](website/index.html) as a single source of truth served by [`tbx-terminal-deck.js`](tbx-terminal-deck.js).
     - [x] Support configuring the target [`tbx-terminal-deck.js`](tbx-terminal-deck.js) daemon URL in the hosted page via `?host=` query param and persisted `localStorage` (`terminal_deck_host`), with CORS headers enabled.
     - [ ] Address HTTPS → HTTP mixed-content restrictions for LAN IPs (e.g. `localhost` vs local TLS/tunnel or keeping the local fallback served by the daemon).
-    - [ ] Auto-open the webpage as the last step when starting [`tbx-terminal-deck.js`](tbx-terminal-deck.js), with a QR code popup/modal for opening on mobile (passing `?host=...` in the QR URL).
-    - [ ] Detect when the local daemon is not reachable on the hosted `toolbox.dev/terminal-deck/` page and show a setup/onboarding prompt with a link and command to run [`tbx-terminal-deck.js`](tbx-terminal-deck.js) locally.
-    - [ ] Add a UI control on the webpage to view, edit, or reset the connected daemon host.
+    - [x] Auto-open the webpage as the last step when starting [`tbx-terminal-deck.js`](tbx-terminal-deck.js), with a QR code popup/modal for opening on mobile (`/info` + `/qr.svg` + `?qr=1`).
+    - [x] Detect when the local daemon is not reachable on the hosted `toolbox.dev/terminal-deck/` page and show a setup/onboarding prompt with a link and command to run [`tbx-terminal-deck.js`](tbx-terminal-deck.js) locally.
+    - [x] Add a UI control on the webpage to view, edit, or reset the connected daemon host.
 
 ---
 
