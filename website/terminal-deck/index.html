@@ -423,6 +423,83 @@
       height: 100%;
       color: var(--text-muted);
       font-size: 0.95rem;
+      padding: 16px;
+    }
+
+    .onboarding-card {
+      max-width: 460px;
+      width: 100%;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 20px;
+      text-align: left;
+      color: var(--text);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+      user-select: text;
+      -webkit-user-select: text;
+    }
+    .onboarding-card h2 {
+      margin: 0 0 8px 0;
+      font-size: 1.05rem;
+      color: var(--accent);
+    }
+    .onboarding-card p {
+      margin: 0 0 12px 0;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      color: var(--text-muted);
+    }
+    .onboarding-cmd {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      background: #020617;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin-bottom: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.82rem;
+      color: #e2e8f0;
+    }
+    .onboarding-cmd code {
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+    .onboarding-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .onboarding-link {
+      color: var(--accent);
+      font-size: 0.84rem;
+      text-decoration: none;
+    }
+    .onboarding-link:hover {
+      text-decoration: underline;
+    }
+    .onboarding-host-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--card-border);
+    }
+    .onboarding-input {
+      flex: 1 1 0;
+      min-width: 0;
+      background: #020617;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 6px 8px;
+      color: var(--text);
+      font-size: 0.8rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     }
 
     /* Workspace & Movable Enter Dock */
@@ -1535,10 +1612,92 @@
     }
 
     // Connect Server-Sent Events (SSE)
+    let hasConnectedOnce = false;
+
+    function isMobileDevice() {
+      return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+        (navigator.maxTouchPoints > 1 && window.innerWidth < 1024);
+    }
+
+    function saveHostAndReload(nextHost) {
+      try {
+        if (nextHost) {
+          localStorage.setItem('terminal_deck_host', nextHost.trim());
+        } else {
+          localStorage.removeItem('terminal_deck_host');
+        }
+      } catch (e) {}
+      const url = new URL(window.location.href);
+      url.searchParams.delete('host');
+      window.location.href = url.toString();
+    }
+
+    function renderDisconnectedOnboarding() {
+      if (hasConnectedOnce || currentWindows.length > 0) return;
+      const emptyState = spatialStage.querySelector('.empty-state');
+      if (!emptyState || emptyState.querySelector('.onboarding-card')) return;
+
+      const targetLabel = apiBase || window.location.origin;
+      const mobile = isMobileDevice();
+      const title = mobile
+        ? '📱 Open on your Mac first'
+        : '💻 Local daemon not detected';
+      const body = mobile
+        ? 'Terminal Deck needs the local Mac daemon running. Open this page on your Mac to start it, or scan the mobile QR code from your Mac.'
+        : `Could not reach Terminal Deck at ${escapeHtml(targetLabel)}. Run the local script on your Mac to stream Terminal.app windows here:`;
+
+      emptyState.innerHTML = `
+        <div class="onboarding-card">
+          <h2>${title}</h2>
+          <p>${body}</p>
+          ${mobile ? '' : `
+            <div class="onboarding-cmd">
+              <code>./tbx-terminal-deck.js</code>
+              <button type="button" class="header-btn" id="copyCmdBtn">Copy</button>
+            </div>
+            <div class="onboarding-actions">
+              <a class="onboarding-link" href="https://github.com/TarasMazepa/tbx-for-toolbox.dev/blob/main/tbx-terminal-deck.js" target="_blank" rel="noopener">View tbx-terminal-deck.js on GitHub ↗</a>
+            </div>
+          `}
+          <div class="onboarding-host-row">
+            <input type="text" class="onboarding-input" id="hostInput" value="${escapeHtml(apiBase)}" placeholder="http://localhost:8999">
+            <button type="button" class="header-btn" id="hostSaveBtn">Connect</button>
+            ${rawHost ? '<button type="button" class="header-btn" id="hostResetBtn">Reset</button>' : ''}
+          </div>
+        </div>
+      `;
+
+      const copyBtn = document.getElementById('copyCmdBtn');
+      if (copyBtn) {
+        copyBtn.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText('./tbx-terminal-deck.js');
+            copyBtn.textContent = 'Copied!';
+            setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
+          } catch (e) {}
+        });
+      }
+
+      const hostInput = document.getElementById('hostInput');
+      const hostSaveBtn = document.getElementById('hostSaveBtn');
+      if (hostSaveBtn && hostInput) {
+        hostSaveBtn.addEventListener('click', () => saveHostAndReload(hostInput.value));
+        hostInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') saveHostAndReload(hostInput.value);
+        });
+      }
+
+      const hostResetBtn = document.getElementById('hostResetBtn');
+      if (hostResetBtn) {
+        hostResetBtn.addEventListener('click', () => saveHostAndReload(''));
+      }
+    }
+
     function connectSSE() {
       const evtSource = new EventSource(`${apiBase}/events`);
 
       evtSource.onopen = () => {
+        hasConnectedOnce = true;
         statusDot.className = 'status-dot online';
         statusText.textContent = 'Live';
         enableKeepAwake();
@@ -1563,6 +1722,7 @@
       evtSource.onerror = () => {
         statusDot.className = 'status-dot';
         statusText.textContent = 'Reconnecting';
+        renderDisconnectedOnboarding();
         evtSource.close();
         setTimeout(connectSSE, 2000);
       };
