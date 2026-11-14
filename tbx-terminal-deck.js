@@ -411,57 +411,62 @@ function injectKey(windowId, key) {
       }
     } catch(e) {}
 
-    // 1. Focus target window
-    terminal.activate();
-    try {
-      terminal.windows.byId(${windowId}).index = 1;
-    } catch(e) {}
+    const alreadyFocused = frontAppName === "Terminal" && prevWindowId === ${windowId};
 
-    let focusConfirmed = false;
-    ${code !== null ? `
-    // 2. Poll until Terminal is frontmost and target window is index 1 (up to 500ms)
-    for (let attempt = 0; attempt < 20; attempt++) {
+    // 1. Focus target window (skip if already focused)
+    if (!alreadyFocused) {
+      terminal.activate();
       try {
-        const curFront = sys.processes.whose({ frontmost: true })[0];
-        const curFrontName = curFront ? curFront.name() : null;
-        const targetWin = terminal.windows.byId(${windowId});
-        if (curFrontName === "Terminal" && targetWin && targetWin.index() === 1) {
-          focusConfirmed = true;
-          break;
-        }
-        terminal.activate();
-        targetWin.index = 1;
+        terminal.windows.byId(${windowId}).index = 1;
       } catch(e) {}
-      delay(0.025);
     }
 
-    if (focusConfirmed) {
+    let focusConfirmed = alreadyFocused;
+    ${code !== null ? `
+    if (!alreadyFocused) {
+      // 2. Wait for Terminal to become frontmost and target window to reach index 1 (up to 400ms)
+      for (let attempt = 0; attempt < 16; attempt++) {
+        try {
+          const isTerminalFront = terminal.frontmost();
+          const targetWin = terminal.windows.byId(${windowId});
+          if (isTerminalFront && targetWin && targetWin.index() === 1) {
+            focusConfirmed = true;
+            break;
+          }
+        } catch(e) {}
+        delay(0.025);
+      }
+
       // Allow macOS Window Server to settle focus on target window before keystroke
-      delay(0.12);
+      delay(0.15);
+    }
 
-      // 3. Dispatch keystroke
-      sys.keyCode(${code});
+    // 3. Dispatch keystroke
+    sys.keyCode(${code});
 
+    if (!alreadyFocused) {
       // 4. Brief pause to ensure the key event is queued/consumed before focus switch
       delay(0.08);
     }
     ` : 'focusConfirmed = true;'}
 
-    // 5. Automatically restore focus back if this was a keystroke (not an explicit focus request)
+    // 5. Automatically restore focus back if this was a keystroke and focus changed
     ${!isExplicitFocus ? `
-    try {
-      if (frontAppName && frontAppName !== "Terminal") {
-        Application(frontAppName).activate();
-      } else if (prevWindowId && prevWindowId !== ${windowId}) {
-        terminal.windows.byId(prevWindowId).index = 1;
-        terminal.activate();
-      }
-    } catch(e) {}
+    if (!alreadyFocused) {
+      try {
+        if (frontAppName && frontAppName !== "Terminal") {
+          Application(frontAppName).activate();
+        } else if (prevWindowId && prevWindowId !== ${windowId}) {
+          terminal.windows.byId(prevWindowId).index = 1;
+          terminal.activate();
+        }
+      } catch(e) {}
+    }
     ` : ''}
 
     JSON.stringify({
-      success: focusConfirmed,
-      error: focusConfirmed ? null : "Target window did not gain focus before keystroke",
+      success: true,
+      focusConfirmed: focusConfirmed,
       windowId: ${windowId},
       key: "${normalizedKey}",
       frontAppName: frontAppName,
@@ -476,11 +481,7 @@ function injectKey(windowId, key) {
     timeout: 3000
   });
 
-  const parsed = JSON.parse(out.trim());
-  if (!parsed.success) {
-    throw new Error(parsed.error || `Failed to focus window ${windowId}`);
-  }
-  return parsed;
+  return JSON.parse(out.trim());
 }
 
 /**
