@@ -138,6 +138,46 @@ Accept this file edit?
   ↑/↓ Navigate · f full diff
 esc to cancel                                                                          Gemini 4 Hydrogen · medium`,
   },
+  {
+    name: 'at-mention-file-search-typing',
+    userChoice: false,
+    windowName: 'agy',
+    cols: 113,
+    notes: 'Autocomplete @ file search while typing (@MORE-AGENTS6) with "↑/↓ Navigate · enter Select · tab Complete" and model status line.',
+    text: `> what are the changes we have in this repository?
+
+○ Thought for 2.1s (Initial assessment: The user is asking about the changes in the repository. The presence...)
+● Ran 4 commands (+2 · stax log · ls -la vAYzyzN-macos-terminal/) (ctrl+o to expand)
+
+▸ Thought for 3s, 283 tokens
+
+  The repository is on main (up to date with origin/main) with no modified or staged tracked files.           
+                                                                                                              
+  The only change in the working tree is a single untracked directory:                                        
+                                                                                                              
+  • vAYzyzN-macos-terminal/ — contains hivebud run artifacts, including:                                      
+      • vAYzyzN-macos-terminal/hivebud.json, hivebud-*.jsonl logs/analytics, and                              
+      vAYzyzN-macos-terminal/hivebud-watchdog.log                                                             
+      • criteria*.jsonl, items*.jsonl, scores*.jsonl, weights*.jsonl, and                                     
+      vAYzyzN-macos-terminal/scores-formatted.txt                                                             
+      • http-body/                                                                                            
+      • vAYzyzN-macos-terminal/macos-terminal-guide.html                                                      
+                                                                                                              
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+> let's add a lines to @MORE-AGENTS6  
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+> Type to search workspace files...  File        Keep typing to filter files or directories
+
+
+
+
+
+
+
+  ↑/↓ Navigate · enter Select · tab Complete
+                                                                                auto · Gemini 4 Hydrogen · medium`,
+  },
 ];
 
 module.exports = {
