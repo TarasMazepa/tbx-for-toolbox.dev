@@ -122,20 +122,11 @@ function detectAgyState(windowName, analysisText, cols) {
   // Meaningful lines exclude horizontal rules (e.g. ───────, -------, =======)
   const meaningful = trimmed.filter(l => !/^[─\-_=*]+$/.test(l));
 
-  // Check specifically for Antigravity's interactive navigation prompt in the last two strings
-  const lastTwoMeaningful = meaningful.slice(-2);
-  const lastTwoTrimmed = trimmed.slice(-2);
-  const lastThreeTrimmed = trimmed.slice(-3);
-
-  const containsNavigate = str =>
-    str.includes('Navigate') ||
-    str.includes('↑/↓') ||
-    (str.includes('↑') && str.includes('↓'));
-
-  const isActionRequired =
-    lastTwoMeaningful.some(containsNavigate) ||
-    lastTwoTrimmed.some(containsNavigate) ||
-    lastThreeTrimmed.some(containsNavigate);
+  // Check for Antigravity's interactive navigation prompt in the last two meaningful lines,
+  // excluding input autocomplete popups (e.g. "↑/↓ Navigate · enter Select · tab Complete")
+  const isActionRequired = meaningful
+    .slice(-2)
+    .some(line => !line.includes('tab Complete') && line.includes('↑/↓ Navigate'));
 
   if (isActionRequired) {
     return { status: 'action_required', label: '⚠️ ACTION REQUIRED', color: 'amber', actionRequired: true };
