@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const http = require('node:http');
 const {
   detectAgyState,
+  generateQrSvg,
   isHostedUrlReachable,
   getDesktopOpenUrl,
 } = require('../../tbx-terminal-deck.js');
@@ -59,4 +60,12 @@ test('isHostedUrlReachable checks HTTP status and handles unreachable URLs', asy
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
+});
+
+test('generateQrSvg renders a valid SVG QR code for hosted URL', () => {
+  const svg = generateQrSvg('https://tbx-for-toolbox.dev/terminal-deck/?host=http%3A%2F%2F192.168.1.50%3A8999');
+  assert.ok(svg && svg.startsWith('<svg xmlns="http://www.w3.org/2000/svg"'));
+  assert.ok(svg.includes('viewBox="0 0 '));
+  assert.ok(svg.includes('<rect x="2" y="2" width="1" height="1"'));
+  assert.ok(svg.endsWith('</svg>'));
 });

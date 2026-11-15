@@ -8,10 +8,10 @@ Exploratory scratchpad for backlog ideas, investigative spikes, architectural in
 
 - [ ] **6. Migrate Root Scripts into `path/` and `scripts/` Directories**
   - **Idea**: Move scripts out of the repository root so primary CLI scripts (meant to be on `PATH`) live in `path/` and secondary/helper scripts (not invoked directly) live in `scripts/`.
-  - **Context**: Currently all `tbx-*.sh` and `tbx-*.js` scripts sit in the repository root alongside config and documentation files, mixing user-facing CLI entrypoints with internal helpers (like [`tbx-qr-terminal.js`](tbx-qr-terminal.js)). Separating them into `path/` and `scripts/` keeps the root clean and makes `PATH` / Homebrew packaging straightforward.
+  - **Context**: Currently all `tbx-*.sh` and `tbx-*.js` scripts sit in the repository root alongside config and documentation files, mixing user-facing CLI entrypoints with internal/helper scripts. Separating them into `path/` and `scripts/` keeps the root clean and makes `PATH` / Homebrew packaging straightforward.
   - **Investigation**:
     - [ ] Classify all root `tbx-*` scripts into primary (`path/`) vs. secondary/helper (`scripts/`).
-    - [ ] Update relative `require`/path references (e.g. [`tbx-terminal-deck.js`](tbx-terminal-deck.js) loading `tbx-qr-terminal.js` and `website/terminal-deck/index.html`, plus `tests/terminal-deck/test.js`).
+    - [ ] Update relative `require`/path references (e.g. [`tbx-terminal-deck.js`](tbx-terminal-deck.js) loading `website/terminal-deck/index.html`, plus `tests/terminal-deck/test.js`).
     - [ ] Update documentation and workflow references in [`AGENTS.md`](AGENTS.md), [`MORE-AGENTS.md`](MORE-AGENTS.md), and `.github/workflows/`.
 
 - [ ] **5. Publish `tbx` Scripts to Homebrew with `tbx <command>` Dispatcher**

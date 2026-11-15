@@ -29,58 +29,310 @@ const { execFileSync, execFile } = require('child_process');
 const crypto = require('crypto');
 
 
-let qrGenerator = null;
-try {
-  qrGenerator = require('./tbx-qr-terminal.js');
-} catch (e) {}
-
 /**
- * Print compact ASCII QR code to terminal stdout
+ * Minimal self-contained QR Code (EC Level L, Byte Mode, Versions 1-10) SVG generator for /qr.svg.
  */
-function printQrCode(url) {
-  if (qrGenerator && typeof qrGenerator.generate === 'function') {
-    try {
-      qrGenerator.generate(url, { small: true }, ascii => {
-        console.log(ascii);
-      });
-      return;
-    } catch (e) {}
-  }
-}
+function generateQrSvg(text) {
+  const bytes = Buffer.from(String(text), 'utf8');
+  // EC Level L RS specs: [version, [[count, dataBytes], ...], ecBytesPerBlock, alignCenters]
+  const QR_SPECS = [
+    [1, [[1, 19]], 7, []],
+    [2, [[1, 34]], 10, [6, 18]],
+    [3, [[1, 55]], 15, [6, 22]],
+    [4, [[1, 80]], 20, [6, 26]],
+    [5, [[1, 108]], 26, [6, 30]],
+    [6, [[2, 68]], 18, [6, 34]],
+    [7, [[2, 78]], 20, [6, 22, 38]],
+    [8, [[2, 97]], 24, [6, 24, 42]],
+    [9, [[2, 116]], 30, [6, 26, 46]],
+    [10, [[2, 68], [2, 69]], 18, [6, 28, 50]],
+  ];
 
-/**
- * Render an SVG QR code from tbx-qr-terminal.js ANSI output
- */
-function generateQrSvg(url) {
-  if (!qrGenerator || typeof qrGenerator.generate !== 'function') {
-    return null;
-  }
-  let raw = '';
-  qrGenerator.generate(url, {}, out => {
-    raw = out;
-  });
-  const lines = raw.split('\n').filter(Boolean);
-  const rows = lines.map(line => {
-    const cells = [];
-    const re = /\x1B\[(40|47)m  \x1B\[0m/g;
-    let match;
-    while ((match = re.exec(line)) !== null) {
-      cells.push(match[1] === '40');
+  let spec = null;
+  for (const s of QR_SPECS) {
+    const totalData = s[1].reduce((sum, [cnt, d]) => sum + cnt * d, 0);
+    const headerBits = 4 + (s[0] <= 9 ? 8 : 16);
+    if (headerBits + bytes.length * 8 <= totalData * 8) {
+      spec = s;
+      break;
     }
-    return cells;
-  }).filter(r => r.length > 0);
+  }
+  if (!spec) return null;
 
-  if (rows.length === 0) return null;
-  const size = rows.length;
+  const [version, groupDefs, ecLen, alignCenters] = spec;
+  const totalDataBytes = groupDefs.reduce((sum, [cnt, d]) => sum + cnt * d, 0);
+
+  // Build bit stream: Byte mode (0100) + length + payload + terminator + padding
+  const bits = [];
+  const pushBits = (val, len) => {
+    for (let i = len - 1; i >= 0; i--) bits.push((val >>> i) & 1);
+  };
+  pushBits(0b0100, 4);
+  pushBits(bytes.length, version <= 9 ? 8 : 16);
+  for (const b of bytes) pushBits(b, 8);
+  for (let i = 0; i < 4 && bits.length < totalDataBytes * 8; i++) bits.push(0);
+  while (bits.length % 8 !== 0) bits.push(0);
+  const dataBytes = [];
+  for (let i = 0; i < bits.length; i += 8) {
+    let v = 0;
+    for (let j = 0; j < 8; j++) v = (v << 1) | bits[i + j];
+    dataBytes.push(v);
+  }
+  const padBytes = [0xec, 0x11];
+  for (let i = 0; dataBytes.length < totalDataBytes; i++) {
+    dataBytes.push(padBytes[i % 2]);
+  }
+
+  // GF(256) arithmetic for Reed-Solomon
+  const exp = new Uint8Array(512);
+  const log = new Uint8Array(256);
+  for (let i = 0, x = 1; i < 255; i++) {
+    exp[i] = x;
+    log[x] = i;
+    x <<= 1;
+    if (x & 0x100) x ^= 0x11d;
+  }
+  for (let i = 255; i < 512; i++) exp[i] = exp[i - 255];
+
+  const rsPoly = (degree) => {
+    let poly = [1];
+    for (let i = 0; i < degree; i++) {
+      const next = new Array(poly.length + 1).fill(0);
+      const factor = exp[i];
+      for (let j = 0; j < poly.length; j++) {
+        next[j] ^= poly[j];
+        next[j + 1] ^= poly[j] === 0 ? 0 : exp[(log[poly[j]] + log[factor]) % 255];
+      }
+      poly = next;
+    }
+    return poly;
+  };
+
+  const rsCompute = (data, gen) => {
+    const res = new Uint8Array(data.length + gen.length - 1);
+    res.set(data);
+    for (let i = 0; i < data.length; i++) {
+      const coef = res[i];
+      if (coef !== 0) {
+        for (let j = 0; j < gen.length; j++) {
+          if (gen[j] !== 0) {
+            res[i + j] ^= exp[(log[coef] + log[gen[j]]) % 255];
+          }
+        }
+      }
+    }
+    return res.slice(data.length);
+  };
+
+  const gen = rsPoly(ecLen);
+  const dataBlocks = [];
+  const ecBlocks = [];
+  let offset = 0;
+  for (const [cnt, dLen] of groupDefs) {
+    for (let i = 0; i < cnt; i++) {
+      const block = dataBytes.slice(offset, offset + dLen);
+      offset += dLen;
+      dataBlocks.push(block);
+      ecBlocks.push(rsCompute(block, gen));
+    }
+  }
+
+  // Interleave data and EC codewords
+  const codewords = [];
+  const maxDataLen = Math.max(...dataBlocks.map(b => b.length));
+  for (let i = 0; i < maxDataLen; i++) {
+    for (const b of dataBlocks) if (i < b.length) codewords.push(b[i]);
+  }
+  for (let i = 0; i < ecLen; i++) {
+    for (const b of ecBlocks) codewords.push(b[i]);
+  }
+
+  const size = version * 4 + 17;
+  const createGrid = () => Array.from({ length: size }, () => new Int8Array(size).fill(-1));
+  const placeFinder = (grid, r0, c0) => {
+    for (let dr = -1; dr <= 7; dr++) {
+      for (let dc = -1; dc <= 7; dc++) {
+        const r = r0 + dr;
+        const c = c0 + dc;
+        if (r < 0 || r >= size || c < 0 || c >= size) continue;
+        const onEdge = dr === 0 || dr === 6 || dc === 0 || dc === 6;
+        const inCore = dr >= 2 && dr <= 4 && dc >= 2 && dc <= 4;
+        const inFrame = dr >= 0 && dr <= 6 && dc >= 0 && dc <= 6;
+        grid[r][c] = inFrame && (onEdge || inCore) ? 1 : 0;
+      }
+    }
+  };
+
+  const setupBase = () => {
+    const grid = createGrid();
+    placeFinder(grid, 0, 0);
+    placeFinder(grid, 0, size - 7);
+    placeFinder(grid, size - 7, 0);
+    for (const r of alignCenters) {
+      for (const c of alignCenters) {
+        if (grid[r][c] !== -1) continue;
+        for (let dr = -2; dr <= 2; dr++) {
+          for (let dc = -2; dc <= 2; dc++) {
+            grid[r + dr][c + dc] =
+              Math.abs(dr) === 2 || Math.abs(dc) === 2 || (dr === 0 && dc === 0) ? 1 : 0;
+          }
+        }
+      }
+    }
+    for (let i = 8; i < size - 8; i++) {
+      if (grid[i][6] === -1) grid[i][6] = i % 2 === 0 ? 1 : 0;
+      if (grid[6][i] === -1) grid[6][i] = i % 2 === 0 ? 1 : 0;
+    }
+    grid[size - 8][8] = 1;
+    // Reserve format info cells
+    for (let i = 0; i < 9; i++) {
+      if (i !== 6) {
+        if (grid[8][i] === -1) grid[8][i] = 0;
+        if (grid[i][8] === -1) grid[i][8] = 0;
+      }
+    }
+    for (let i = 0; i < 8; i++) {
+      if (grid[8][size - 1 - i] === -1) grid[8][size - 1 - i] = 0;
+      if (i < 7 && grid[size - 1 - i][8] === -1) grid[size - 1 - i][8] = 0;
+    }
+    // Version info for >= 7
+    if (version >= 7) {
+      let rem = version << 12;
+      for (let i = 5; i >= 0; i--) {
+        if ((rem >>> (i + 12)) & 1) rem ^= 0x1f25 << i;
+      }
+      const vBits = (version << 12) | rem;
+      for (let i = 0; i < 18; i++) {
+        const bit = (vBits >>> i) & 1;
+        const a = Math.floor(i / 3);
+        const b = size - 11 + (i % 3);
+        grid[a][b] = bit;
+        grid[b][a] = bit;
+      }
+    }
+    return grid;
+  };
+
+  const baseGrid = setupBase();
+  const isDataCell = Array.from({ length: size }, (_, r) =>
+    Array.from({ length: size }, (__, c) => baseGrid[r][c] === -1)
+  );
+
+  // Place data bits in zigzag
+  let bitIdx = 0;
+  let dir = -1;
+  for (let col = size - 1; col > 0; col -= 2) {
+    if (col === 6) col--;
+    for (let step = 0; step < size; step++) {
+      const row = dir === -1 ? size - 1 - step : step;
+      for (let dc = 0; dc < 2; dc++) {
+        const c = col - dc;
+        if (isDataCell[row][c]) {
+          const byteIdx = bitIdx >>> 3;
+          const bit = byteIdx < codewords.length ? (codewords[byteIdx] >>> (7 - (bitIdx & 7))) & 1 : 0;
+          baseGrid[row][c] = bit;
+          bitIdx++;
+        }
+      }
+    }
+    dir = -dir;
+  }
+
+  const maskFns = [
+    (r, c) => (r + c) % 2 === 0,
+    (r) => r % 2 === 0,
+    (_, c) => c % 3 === 0,
+    (r, c) => (r + c) % 3 === 0,
+    (r, c) => (Math.floor(r / 2) + Math.floor(c / 3)) % 2 === 0,
+    (r, c) => ((r * c) % 2) + ((r * c) % 3) === 0,
+    (r, c) => (((r * c) % 2) + ((r * c) % 3)) % 2 === 0,
+    (r, c) => (((r + c) % 2) + ((r * c) % 3)) % 2 === 0,
+  ];
+
+  const applyMaskAndFormat = (maskIdx) => {
+    const grid = baseGrid.map(row => new Int8Array(row));
+    const fn = maskFns[maskIdx];
+    for (let r = 0; r < size; r++) {
+      for (let c = 0; c < size; c++) {
+        if (isDataCell[r][c] && fn(r, c)) grid[r][c] ^= 1;
+      }
+    }
+    const fmtData = (0b01 << 3) | maskIdx; // EC level L = 01
+    let rem = fmtData << 10;
+    for (let i = 4; i >= 0; i--) {
+      if ((rem >>> (i + 10)) & 1) rem ^= 0x537 << i;
+    }
+    const fmt = ((fmtData << 10) | rem) ^ 0x5412;
+    for (let i = 0; i < 15; i++) {
+      const bit = (fmt >>> i) & 1;
+      if (i < 6) grid[i][8] = bit;
+      else if (i < 8) grid[i + 1][8] = bit;
+      else grid[size - 15 + i][8] = bit;
+
+      if (i < 8) grid[8][size - 1 - i] = bit;
+      else if (i < 9) grid[8][15 - i] = bit;
+      else grid[8][14 - i] = bit;
+    }
+    return grid;
+  };
+
+  const penalty = (grid) => {
+    let score = 0;
+    for (let r = 0; r < size; r++) {
+      let run = 1;
+      for (let c = 1; c < size; c++) {
+        if (grid[r][c] === grid[r][c - 1]) {
+          run++;
+          if (run === 5) score += 3;
+          else if (run > 5) score += 1;
+        } else {
+          run = 1;
+        }
+      }
+    }
+    for (let c = 0; c < size; c++) {
+      let run = 1;
+      for (let r = 1; r < size; r++) {
+        if (grid[r][c] === grid[r - 1][c]) {
+          run++;
+          if (run === 5) score += 3;
+          else if (run > 5) score += 1;
+        } else {
+          run = 1;
+        }
+      }
+    }
+    for (let r = 0; r < size - 1; r++) {
+      for (let c = 0; c < size - 1; c++) {
+        const v = grid[r][c];
+        if (v === grid[r][c + 1] && v === grid[r + 1][c] && v === grid[r + 1][c + 1]) score += 3;
+      }
+    }
+    return score;
+  };
+
+  let bestGrid = null;
+  let bestScore = Infinity;
+  for (let m = 0; m < 8; m++) {
+    const g = applyMaskAndFormat(m);
+    const s = penalty(g);
+    if (s < bestScore) {
+      bestScore = s;
+      bestGrid = g;
+    }
+  }
+
+  const quiet = 2;
+  const viewSize = size + quiet * 2;
   const rects = [];
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < rows[y].length; x++) {
-      if (rows[y][x]) {
-        rects.push(`<rect x="${x}" y="${y}" width="1" height="1" fill="#0f172a"/>`);
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      if (bestGrid[r][c]) {
+        rects.push(`<rect x="${c + quiet}" y="${r + quiet}" width="1" height="1" fill="#0f172a"/>`);
       }
     }
   }
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" shape-rendering="crispEdges"><rect width="${size}" height="${size}" fill="#ffffff"/>${rects.join('')}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${viewSize} ${viewSize}" shape-rendering="crispEdges"><rect width="${viewSize}" height="${viewSize}" fill="#ffffff"/>${rects.join('')}</svg>`;
 }
 
 const PORT = parseInt(process.env.PORT || '8999', 10);
@@ -821,6 +1073,7 @@ function pollAndBroadcast() {
 module.exports = {
   API_VERSION,
   detectAgyState,
+  generateQrSvg,
   isHostedUrlReachable,
   getDesktopOpenUrl,
 };
@@ -853,8 +1106,6 @@ if (require.main === module) {
     console.log(`Phone (QR URL):   ${phoneUrl}`);
     console.log(`Direct LAN URL:   http://${localIp}:${PORT}`);
     console.log(`mDNS Link:        http://${hostname}:${PORT}`);
-    console.log(`\nScan with Phone Camera to Open Spatial Controller:`);
-    printQrCode(phoneUrl);
     console.log(`======================================================`);
     console.log(`Keep-Awake:`);
     console.log(`  • Web Controller: Screen Wake Lock API + Auto Re-arm Active`);
