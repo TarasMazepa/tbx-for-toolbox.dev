@@ -17,6 +17,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+      - run: sed -i "s/__COMMIT_SHA__/$GITHUB_SHA/g; s/__COMMIT_SHORT__/${GITHUB_SHA::7}/g" website/index.html
       - uses: google-github-actions/auth@v3
         with:
           service_account: brainfucksheetsgithubdeploy@youtube-355604.iam.gserviceaccount.com
