@@ -12,7 +12,7 @@ Exploratory scratchpad for backlog ideas, investigative spikes, architectural in
   - **Investigation**:
     - [x] Move `tbx-*` scripts into `path/` and leave compatibility symlinks in root.
     - [x] Update relative `require`/path references (e.g. [`path/tbx-terminal-deck.js`](path/tbx-terminal-deck.js), [`tests/terminal-deck/test.js`](tests/terminal-deck/test.js), and symlink-safe `SCRIPT_DIR`/`REPO_ROOT` in `path/*.sh`).
-    - [ ] Update documentation and workflow references in [`AGENTS.md`](AGENTS.md), [`MORE-AGENTS.md`](MORE-AGENTS.md), and `.github/workflows/`.
+    - [x] Update documentation and workflow references in [`AGENTS.md`](AGENTS.md), [`MORE-AGENTS.md`](MORE-AGENTS.md), [`README.md`](README.md), [`website/terminal-deck/index.html`](website/terminal-deck/index.html), and `.github/workflows/`.
     - [ ] Remove root compatibility symlinks once `$PATH` points to `path/`.
 
 - [ ] **5. Publish `tbx` Scripts to Homebrew with `tbx <command>` Dispatcher**
