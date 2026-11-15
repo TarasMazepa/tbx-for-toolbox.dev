@@ -858,14 +858,14 @@
       </div>
       <div class="status-badge" id="windowCount">0 windows</div>
       <button type="button" class="header-btn" id="qrBtn" title="Show mobile QR code">📱 QR</button>
-      <button type="button" class="header-btn" id="dockPosBtn" title="Move Enter dock (Bottom / Top / Left / Right)">⬇ Bottom</button>
+      <button type="button" class="header-btn" id="dockPosBtn" title="Move Enter dock (Edge / Bottom / Top / Left / Right / Inline)">◫ Edge</button>
       <button type="button" class="header-btn" id="fullscreenBtn" title="Toggle fullscreen">⛶ Full</button>
     </div>
   </header>
 
   <button type="button" class="header-btn immersive-exit-btn" id="immersiveExitBtn" title="Exit fullscreen">✕ Exit</button>
 
-  <main class="workspace-main" id="workspaceMain" data-dock="bottom">
+  <main class="workspace-main" id="workspaceMain" data-dock="edge">
     <div class="viewport-container" id="viewportContainer">
       <div class="spatial-stage" id="spatialStage">
         <div class="empty-state">Looking for Terminal.app windows...</div>
@@ -921,10 +921,12 @@
     const fullscreenBtn = document.getElementById('fullscreenBtn');
     const immersiveExitBtn = document.getElementById('immersiveExitBtn');
 
-    const DOCK_POSITIONS = ['bottom', 'top', 'left', 'right', 'inline', 'edge'];
+    const DOCK_POSITIONS = ['edge', 'bottom', 'top', 'left', 'right', 'inline'];
     const DOCK_LABELS = { bottom: '⬇ Bottom', top: '⬆ Top', left: '⬅ Left', right: '➡ Right', inline: '▣ Inline', edge: '◫ Edge' };
-    let dockPos = localStorage.getItem('tbx_dock_pos');
-    if (!DOCK_POSITIONS.includes(dockPos)) dockPos = 'bottom';
+    let dockPos = (() => {
+      try { return localStorage.getItem('tbx_dock_pos'); } catch (e) { return null; }
+    })();
+    if (!DOCK_POSITIONS.includes(dockPos)) dockPos = 'edge';
 
     function isPerWindowDock(pos) {
       return pos === 'inline' || pos === 'edge';
@@ -943,7 +945,7 @@
       dockPosBtn.addEventListener('click', () => {
         triggerHaptic(20);
         dockPos = DOCK_POSITIONS[(DOCK_POSITIONS.indexOf(dockPos) + 1) % DOCK_POSITIONS.length];
-        localStorage.setItem('tbx_dock_pos', dockPos);
+        try { localStorage.setItem('tbx_dock_pos', dockPos); } catch (e) {}
         applyDockPosition();
       });
     }
