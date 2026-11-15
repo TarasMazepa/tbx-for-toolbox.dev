@@ -2210,6 +2210,38 @@
       });
     }
 
+    const DEPLOY_PROMPT_KEY = 'terminal_deck_deploy_prompt_at';
+    const DEPLOY_PROMPT_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+    async function checkDeployedUpdate() {
+      if (FRONTEND_COMMIT_TS === null) return;
+      if (window.location.hostname !== 'tbx-for-toolbox.dev') return;
+      try {
+        const lastPrompt = parseInt(localStorage.getItem(DEPLOY_PROMPT_KEY) || '0', 10);
+        if (lastPrompt && (Date.now() - lastPrompt) < DEPLOY_PROMPT_INTERVAL_MS) return;
+
+        const res = await fetch(`/commit-timestamp.txt?t=${Date.now()}`, { cache: 'no-store' });
+        if (!res.ok) return;
+        const text = (await res.text()).trim();
+        if (!/^\d+$/.test(text)) return;
+        const deployedTs = parseInt(text, 10);
+        if (deployedTs > FRONTEND_COMMIT_TS && versionBanner && versionBannerText) {
+          localStorage.setItem(DEPLOY_PROMPT_KEY, String(Date.now()));
+          versionDismissed = false;
+          versionBannerText.textContent = '⚠️ A newer version of Terminal Spatial Remote is deployed — refresh this page.';
+          if (versionRefreshBtn) versionRefreshBtn.hidden = false;
+          versionBanner.hidden = false;
+          handleResize();
+        }
+      } catch (e) {}
+    }
+
+    checkDeployedUpdate();
+    setInterval(checkDeployedUpdate, 60 * 60 * 1000);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') checkDeployedUpdate();
+    });
+
     function isMobileDevice() {
       return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
         (navigator.maxTouchPoints > 1 && window.innerWidth < 1024);
