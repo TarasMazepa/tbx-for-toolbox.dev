@@ -23,20 +23,18 @@ Exploratory scratchpad for backlog ideas, investigative spikes, architectural in
     - [ ] Verify relative resource paths work when installed in Homebrew's `libexec` / `share` (e.g. [`tbx-terminal-deck.js`](tbx-terminal-deck.js) reading `website/terminal-deck/index.html`, and `tbx-*.sh` scripts invoked from any directory).
     - [ ] Set up a Homebrew formula / tap and release automation (e.g. GitHub Actions updating the formula on tag/release).
 
-- [ ] **4. Host Terminal Deck Webpage on `toolbox.dev` Website**
-  - **Idea**: Host the Terminal Deck web controller under `website/terminal-deck/` alongside `website/bookmarklets`, `website/envelope-printer`, and `website/infinity-note`, and link it from [`website/index.html`](website/index.html).
-  - **Context**: Currently [`tbx-terminal-deck.js`](tbx-terminal-deck.js) serves both the HTML UI and the local API/SSE endpoints over plain HTTP (`http://<ip>:8999`). Hosting the UI on `toolbox.dev` (HTTPS) gives a stable URL, matches the rest of the toolbox web apps, and enables native `navigator.wakeLock` support.
-  - **Investigation**:
-    - [x] Host [`website/terminal-deck/index.html`](website/terminal-deck/index.html) and link it from [`website/index.html`](website/index.html) as a single source of truth served by [`tbx-terminal-deck.js`](tbx-terminal-deck.js).
-    - [x] Support configuring the target [`tbx-terminal-deck.js`](tbx-terminal-deck.js) daemon URL in the hosted page via `?host=` query param and persisted `localStorage` (`terminal_deck_host`), with CORS headers enabled.
-    - [ ] Address HTTPS → HTTP mixed-content restrictions for LAN IPs (e.g. `localhost` vs local TLS/tunnel or keeping the local fallback served by the daemon).
-    - [x] Auto-open the webpage as the last step when starting [`tbx-terminal-deck.js`](tbx-terminal-deck.js), with a QR code popup/modal for opening on mobile (`/info` + `/qr.svg` + `?qr=1`).
-    - [x] Detect when the local daemon is not reachable on the hosted `toolbox.dev/terminal-deck/` page and show a setup/onboarding prompt with a link and command to run [`tbx-terminal-deck.js`](tbx-terminal-deck.js) locally.
-    - [x] Add a UI control on the webpage to view, edit, or reset the connected daemon host.
-
 ---
 
 ## Resolved Architectural Decisions
+
+- [x] **4. Host Terminal Deck Webpage on `toolbox.dev` Website**
+  - **Status**: Implemented in [`website/terminal-deck/index.html`](website/terminal-deck/index.html) and [`path/tbx-terminal-deck.js`](path/tbx-terminal-deck.js).
+  - **Resolution**:
+    1. **Hosted UI & Single Source of Truth**: Hosted [`website/terminal-deck/index.html`](website/terminal-deck/index.html) on `tbx-for-toolbox.dev/terminal-deck/`, linked from [`website/index.html`](website/index.html), and served directly by [`path/tbx-terminal-deck.js`](path/tbx-terminal-deck.js) as a local fallback.
+    2. **Configurable Daemon Host**: Added `?host=` query parameter, `localStorage` persistence (`terminal_deck_host`, `terminal_deck_hosts`), and a Hosts management modal with live probing and version compatibility checks.
+    3. **Desktop Auto-Open & Localhost Redirect**: Desktop startup opens the hosted site with `?host=http://localhost:<PORT>&qr=1` when reachable (with offline fallback to `http://localhost:<PORT>`), and local `localhost` loads also redirect to the hosted site when online (bypassed via `--local` / `?local=1`).
+    4. **Mobile Mixed-Content Fallback**: Mobile QR (`/qr.svg` & `phoneUrl`) points to the hosted URL (`https://tbx-for-toolbox.dev/terminal-deck/?host=http://<localIp>:<PORT>`) which works via Local Network permission on mobile browsers, and the hosted page detects HTTPS → HTTP LAN mixed-content blocks on stricter browsers and surfaces a one-tap link to the direct HTTP LAN URL.
+    5. **Onboarding & QR Modal**: Added disconnected onboarding UI with copyable `tbx-terminal-deck.js` command and a mobile QR code modal (`/info` + `/qr.svg` + `?qr=1`).
 
 - [x] **3. Screen Sleep & Dimming Prevention in Remote Terminal**
   - **Status**: Implemented in [`tbx-terminal-deck.js`](tbx-terminal-deck.js).

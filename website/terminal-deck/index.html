@@ -2133,6 +2133,21 @@
       window.location.href = url.toString();
     }
 
+    function isHttpsToLanHttp(targetUrl) {
+      if (window.location.protocol !== 'https:' || !targetUrl) return false;
+      try {
+        const parsed = new URL(targetUrl);
+        return (
+          parsed.protocol === 'http:' &&
+          parsed.hostname !== 'localhost' &&
+          parsed.hostname !== '127.0.0.1' &&
+          parsed.hostname !== '::1'
+        );
+      } catch (e) {
+        return false;
+      }
+    }
+
     function renderDisconnectedOnboarding() {
       if (hasConnectedOnce || currentWindows.length > 0) return;
       const emptyState = spatialStage.querySelector('.empty-state');
@@ -2140,19 +2155,26 @@
 
       const targetLabel = apiBase || window.location.origin;
       const mobile = isMobileDevice();
+      const lanHttpFromHttps = isHttpsToLanHttp(apiBase);
       const otherSavedHosts = loadSavedHosts().filter(h => h.url !== getEffectiveHostUrl());
-      const title = mobile
-        ? '📱 Open on your Mac first'
-        : '💻 Local daemon not detected';
-      const body = mobile
-        ? 'Terminal Deck needs the local Mac daemon running. Open this page on your Mac to start it, or scan the mobile QR code from your Mac.'
-        : `Could not reach Terminal Deck at ${escapeHtml(targetLabel)}. Run the local script on your Mac to stream Terminal.app windows here:`;
+      const title = lanHttpFromHttps
+        ? '📡 Local Network Access Needed'
+        : (mobile ? '📱 Open on your Mac first' : '💻 Local daemon not detected');
+      const body = lanHttpFromHttps
+        ? `Allow <strong>Local Network</strong> access when prompted by your browser (or enable it in browser/OS Settings) so this page can reach ${escapeHtml(apiBase)}. If your browser blocks HTTPS → HTTP LAN requests, open the direct HTTP URL instead:`
+        : (mobile
+          ? 'Terminal Deck needs the local Mac daemon running. Open this page on your Mac to start it, or scan the mobile QR code from your Mac.'
+          : `Could not reach Terminal Deck at ${escapeHtml(targetLabel)}. Run the local script on your Mac to stream Terminal.app windows here:`);
 
       emptyState.innerHTML = `
         <div class="onboarding-card">
           <h2>${title}</h2>
           <p>${body}</p>
-          ${mobile ? '' : `
+          ${lanHttpFromHttps ? `
+            <div class="onboarding-actions">
+              <a class="onboarding-link" href="${escapeHtml(apiBase)}">Open ${escapeHtml(apiBase)} ↗</a>
+            </div>
+          ` : (mobile ? '' : `
             <div class="onboarding-cmd">
               <code>tbx-terminal-deck.js</code>
               <button type="button" class="header-btn" id="copyCmdBtn">Copy</button>
@@ -2160,7 +2182,7 @@
             <div class="onboarding-actions">
               <a class="onboarding-link" href="https://github.com/TarasMazepa/tbx-for-toolbox.dev/blob/main/path/tbx-terminal-deck.js" target="_blank" rel="noopener">View tbx-terminal-deck.js on GitHub ↗</a>
             </div>
-          `}
+          `)}
           <div class="onboarding-host-row">
             <input type="text" class="onboarding-input" id="hostInput" value="${escapeHtml(apiBase)}" placeholder="http://localhost:8999">
             <button type="button" class="header-btn" id="hostSaveBtn">Connect</button>
