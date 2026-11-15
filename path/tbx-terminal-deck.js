@@ -650,7 +650,7 @@ const JXA_FETCH_SCRIPT = `
 
         const nonEmpty = lines.map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0; });
         analysis = nonEmpty.slice(-14).join("\\n");
-        preview = nonEmpty.slice(-25).join("\\n");
+        preview = nonEmpty.slice(-60).join("\\n");
       }
     } catch (e) {}
     
@@ -674,7 +674,7 @@ const JXA_FETCH_SCRIPT = `
 
 /**
  * Clean terminal preview text by removing runs of 2+ '-' or '─' characters,
- * collapsing consecutive whitespace into a single space, and keeping the last 15 non-empty lines.
+ * collapsing consecutive whitespace into a single space, and keeping the last 50 non-empty lines.
  */
 function formatPreviewText(text) {
   if (!text) return '';
@@ -682,7 +682,7 @@ function formatPreviewText(text) {
     .split(/\r?\n/)
     .map(line => line.replace(/[-─]{2,}/g, '').replace(/[^\S\n]{2,}/g, ' ').trim())
     .filter(line => line.length > 0)
-    .slice(-15)
+    .slice(-50)
     .join('\n');
 }
 
