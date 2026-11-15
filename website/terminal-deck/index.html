@@ -8,17 +8,17 @@
   <title>Terminal Spatial Controller</title>
   <style>
     :root {
-      --bg: #040711;
-      --card-bg: #0c1427;
-      --card-border: #1e293b;
-      --card-active-border: #38bdf8;
-      --text: #f8fafc;
-      --text-muted: #94a3b8;
-      --accent: #38bdf8;
+      --bg: #1e1d27;
+      --card-bg: #252330;
+      --card-border: rgba(255, 255, 255, 0.1);
+      --card-active-border: #b294bb;
+      --text: #eae8f2;
+      --text-muted: #7c7694;
+      --accent: #b294bb;
       --enter-btn: #16a34a;
       --enter-btn-active: #15803d;
-      --action-btn: #1e293b;
-      --action-btn-active: #334155;
+      --action-btn: #2e2c3b;
+      --action-btn-active: #3d3a4e;
       --safe-top: env(safe-area-inset-top, 0px);
       --safe-bottom: env(safe-area-inset-bottom, 0px);
     }
@@ -38,7 +38,7 @@
       overflow: hidden;
       background: var(--bg);
       color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
       display: flex;
       flex-direction: column;
     }
@@ -48,7 +48,7 @@
       align-items: center;
       justify-content: space-between;
       padding: calc(var(--safe-top) + 4px) 12px 4px 12px;
-      background: #090e1a;
+      background: #181720;
       border-bottom: 1px solid var(--card-border);
       z-index: 2000;
     }
@@ -75,7 +75,7 @@
       font-size: 0.7rem;
       padding: 2px 7px;
       border-radius: 9999px;
-      background: #1e293b;
+      background: #2e2c3b;
       color: var(--text-muted);
     }
     .status-dot {
@@ -107,9 +107,9 @@
       font-size: 0.62rem;
       font-weight: 800;
       border-radius: 4px;
-      background: #0f172a;
-      border: 1px solid #334155;
-      color: #64748b;
+      background: #282635;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: var(--text-muted);
     }
     button.card-auto-btn.active {
       background: #451a03;
@@ -133,15 +133,15 @@
       font-size: 0.68rem;
       font-weight: 700;
       border-radius: 9999px;
-      background: #0f172a;
-      border: 1px solid #334155;
+      background: #282635;
+      border: 1px solid rgba(255, 255, 255, 0.14);
       color: var(--text);
       gap: 4px;
     }
     button.header-btn.active {
       border-color: var(--accent);
       color: var(--accent);
-      background: #082f49;
+      background: #34293d;
     }
     body.immersive header {
       display: none;
@@ -173,7 +173,7 @@
     }
     .spatial-stage {
       position: relative;
-      background: #070c18;
+      background: #1a1923;
       border: 1px solid #1a253c;
       border-radius: 10px;
       box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7);
@@ -190,7 +190,7 @@
     }
     .monitor-panel {
       position: absolute;
-      border: 1px dashed rgba(56, 189, 248, 0.25);
+      border: 1px dashed rgba(178, 148, 187, 0.25);
       border-radius: 8px;
       box-sizing: border-box;
       pointer-events: none;
@@ -244,7 +244,7 @@
     /* Focused Window State */
     .spatial-window.active .window-card {
       border-color: var(--card-active-border);
-      box-shadow: 0 0 18px rgba(56, 189, 248, 0.35);
+      box-shadow: 0 0 18px rgba(178, 148, 187, 0.35);
     }
 
     /* ACTION REQUIRED STATE (LIT UP! Colorful & Glowing Amber Pulse) */
@@ -303,7 +303,7 @@
       border: 1px solid #f59e0b;
     }
     .state-badge.badge-blue {
-      background: #0369a1;
+      background: #6d5278;
       color: #e0f2fe;
     }
     .state-badge.badge-green {
@@ -316,7 +316,7 @@
       text-transform: uppercase;
       padding: 2px 5px;
       border-radius: 4px;
-      background: #0284c7;
+      background: #82648f;
       color: #ffffff;
       letter-spacing: 0.04em;
     }
@@ -325,8 +325,8 @@
     .terminal-preview {
       margin: 2px 0 6px 0;
       padding: 6px 8px;
-      background: #050814;
-      border: 1px solid #1a253c;
+      background: #14131b;
+      border: 1px solid #2e2c3b;
       border-radius: 8px;
       font-family: ui-monospace, "SF Mono", "Fira Code", Menlo, monospace;
       font-size: clamp(0.62rem, 1.15vw, 0.78rem);
@@ -464,7 +464,7 @@
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      background: #020617;
+      background: #14131b;
       border: 1px solid var(--card-border);
       border-radius: 8px;
       padding: 8px 10px;
@@ -502,7 +502,7 @@
     .onboarding-input {
       flex: 1 1 0;
       min-width: 0;
-      background: #020617;
+      background: #14131b;
       border: 1px solid var(--card-border);
       border-radius: 6px;
       padding: 6px 8px;
@@ -537,7 +537,7 @@
       align-items: stretch;
       gap: 6px;
       padding: 6px 8px calc(var(--safe-bottom) + 6px) 8px;
-      background: #090e1a;
+      background: #181720;
       border-top: 1px solid var(--card-border);
       z-index: 2000;
     }
@@ -576,8 +576,8 @@
       min-height: clamp(42px, 5.5vh, 54px);
       padding: 6px 8px;
       border-radius: 10px;
-      background: #111c33;
-      border: 1px solid #1e293b;
+      background: #282635;
+      border: 1px solid rgba(255, 255, 255, 0.1);
       border-top: 3px solid var(--win-color, var(--enter-btn));
       display: flex;
       flex-direction: column;
@@ -587,17 +587,17 @@
       color: #ffffff;
     }
     .workspace-main[data-dock="top"] button.dock-enter-btn {
-      border-top: 1px solid #1e293b;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
       border-bottom: 3px solid var(--win-color, var(--enter-btn));
     }
     .workspace-main[data-dock="left"] button.dock-enter-btn {
-      border-top: 1px solid #1e293b;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
       border-right: 3px solid var(--win-color, var(--enter-btn));
       min-height: 0;
       padding: 4px 3px;
     }
     .workspace-main[data-dock="right"] button.dock-enter-btn {
-      border-top: 1px solid #1e293b;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
       border-left: 3px solid var(--win-color, var(--enter-btn));
       min-height: 0;
       padding: 4px 3px;
@@ -614,10 +614,10 @@
       flex: 0 0 auto;
       width: 100%;
       margin-top: 4px;
-      background: #111c33;
-      border: 1px solid #1e293b;
+      background: #282635;
+      border: 1px solid rgba(255, 255, 255, 0.1);
       border-top: 3px solid var(--win-color, var(--enter-btn));
-      color: #cbd5e1;
+      color: var(--text);
       font-size: clamp(0.8rem, 1.6vw, 1.15rem);
       font-weight: 800;
       min-height: clamp(32px, 4vh, 42px);
@@ -678,7 +678,7 @@
       animation: pulse-enter 1.6s infinite ease-in-out;
     }
     button.inline-enter-btn.is-sending {
-      background: #0369a1;
+      background: #6d5278;
       animation: none;
     }
     button.inline-enter-btn.is-sent {
@@ -691,7 +691,7 @@
     }
     button.dock-enter-btn:active {
       transform: scale(0.95);
-      background: #1e293b;
+      background: #2e2c3b;
     }
     button.dock-enter-btn.action-required {
       background: var(--enter-btn);
@@ -744,9 +744,9 @@
       animation: connector-flow 0.45s linear infinite;
     }
     button.dock-enter-btn.is-sending {
-      background: #0369a1;
-      border-color: #38bdf8;
-      box-shadow: 0 0 14px rgba(56, 189, 248, 0.7);
+      background: #6d5278;
+      border-color: #b294bb;
+      box-shadow: 0 0 14px rgba(178, 148, 187, 0.7);
       animation: none;
     }
     button.dock-enter-btn.is-sent {
@@ -762,8 +762,8 @@
       animation: none;
     }
     .spatial-window.is-sending .window-card {
-      border-color: #38bdf8 !important;
-      box-shadow: 0 0 18px rgba(56, 189, 248, 0.55);
+      border-color: #b294bb !important;
+      box-shadow: 0 0 18px rgba(178, 148, 187, 0.55);
     }
     .spatial-window.is-sent .window-card {
       border-color: #4ade80 !important;
@@ -825,7 +825,7 @@
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      background: #020617;
+      background: #14131b;
       border: 1px solid var(--card-border);
       border-radius: 8px;
       padding: 6px 10px;
@@ -870,7 +870,7 @@
       text-align: center;
     }
     .hosts-summary {
-      background: #020617;
+      background: #14131b;
       border: 1px solid var(--card-border);
       border-radius: 8px;
       padding: 8px 10px;
@@ -909,7 +909,7 @@
       gap: 8px;
       padding: 8px 10px;
       border-radius: 8px;
-      background: #020617;
+      background: #14131b;
       border: 1px solid var(--card-border);
     }
     .host-item.is-active {
@@ -949,7 +949,7 @@
       font-weight: 700;
       padding: 1px 6px;
       border-radius: 9999px;
-      background: #1e293b;
+      background: #2e2c3b;
       color: var(--text-muted);
       white-space: nowrap;
     }
@@ -1188,7 +1188,7 @@
     const spatialStage = document.getElementById('spatialStage');
     const enterDock = document.getElementById('enterDock');
     const connectorLayer = document.getElementById('connectorLayer');
-    const WINDOW_COLORS = ['#38bdf8', '#a78bfa', '#f472b6', '#34d399', '#fb923c', '#facc15', '#818cf8', '#2dd4bf'];
+    const WINDOW_COLORS = ['#b294bb', '#a78bfa', '#f472b6', '#34d399', '#fb923c', '#facc15', '#818cf8', '#2dd4bf'];
     let connectorTimer = null;
     const workspaceMain = document.getElementById('workspaceMain');
     const dockPosBtn = document.getElementById('dockPosBtn');
@@ -1599,7 +1599,7 @@
       if (path) {
         path.classList.toggle('connector-path-sending', stage === 'sending' || stage === 'started');
         let overrideColor = null;
-        if (stage === 'sending' || stage === 'started') overrideColor = '#38bdf8';
+        if (stage === 'sending' || stage === 'started') overrideColor = '#b294bb';
         else if (stage === 'completed') overrideColor = '#4ade80';
         else if (stage === 'error') overrideColor = '#f87171';
         if (overrideColor) {
@@ -1734,8 +1734,8 @@
         const dispatchStage = keyDispatchState.get(w.id)?.stage || null;
         const isSending = dispatchStage === 'sending' || dispatchStage === 'started';
         const isActionRequired = w.agyState && w.agyState.actionRequired;
-        let color = isActionRequired ? '#fbbf24' : (colorById.get(w.id) || '#38bdf8');
-        if (isSending) color = '#38bdf8';
+        let color = isActionRequired ? '#fbbf24' : (colorById.get(w.id) || '#b294bb');
+        if (isSending) color = '#b294bb';
         else if (dispatchStage === 'completed') color = '#4ade80';
         else if (dispatchStage === 'error') color = '#f87171';
 
@@ -1791,7 +1791,7 @@
         const shortName = getShortWindowLabel(w.name);
         const isActionRequired = !!(w.agyState && w.agyState.actionRequired);
         const isAccepting = activeAutoAccepts.has(w.id);
-        const color = colorById.get(w.id) || '#38bdf8';
+        const color = colorById.get(w.id) || '#b294bb';
 
         let btn = existingBtns.get(w.id);
         if (!btn) {
@@ -2075,7 +2075,7 @@
         else if (dispatchStage === 'error') classNames += ' is-error';
         card.className = classNames;
 
-        card.style.setProperty('--win-color', colorById.get(w.id) || '#38bdf8');
+        card.style.setProperty('--win-color', colorById.get(w.id) || '#b294bb');
         card.style.left = leftPercent + '%';
         card.style.top = topPercent + '%';
         card.style.width = widthPercent + '%';
