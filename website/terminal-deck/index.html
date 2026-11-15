@@ -1284,7 +1284,17 @@
       if (Array.isArray(rawIds)) savedAutoAcceptIds = rawIds.map(n => parseInt(n, 10)).filter(Boolean);
     } catch (e) {}
     const autoAcceptIds = new Set(savedAutoAcceptIds);
-    const activeAutoAccepts = new Set();
+    const activeAutoAccepts = new Map();
+    const AUTO_ACCEPT_RETRY_MS = 2500;
+
+    function clearAutoAcceptEntry(id) {
+      const entry = activeAutoAccepts.get(id);
+      if (entry) {
+        if (entry.timer) clearTimeout(entry.timer);
+        if (entry.retryTimer) clearTimeout(entry.retryTimer);
+        activeAutoAccepts.delete(id);
+      }
+    }
 
     function saveAutoAcceptIds() {
       localStorage.setItem('tbx_auto_accept_ids', JSON.stringify([...autoAcceptIds]));
@@ -1294,7 +1304,7 @@
       const id = parseInt(windowId, 10);
       if (autoAcceptIds.has(id)) {
         autoAcceptIds.delete(id);
-        activeAutoAccepts.delete(id);
+        clearAutoAcceptEntry(id);
       } else {
         autoAcceptIds.add(id);
       }
@@ -1339,38 +1349,66 @@
       });
     }
 
+    function scheduleAutoAccept(w, delayMs = 350, attempts = 1) {
+      clearAutoAcceptEntry(w.id);
+      console.log(`[⚡ Auto-Accept] Action required on window ${w.id} (${w.name}). Scheduling Enter (attempt ${attempts})...`);
+
+      const enterBtn = enterDock ? enterDock.querySelector('.dock-enter-btn[data-id="' + w.id + '"] .dock-btn-action') : null;
+      if (enterBtn) {
+        enterBtn.textContent = attempts > 1 ? '⚡ RETRYING...' : '⚡ ACCEPTING...';
+        enterBtn.parentElement.style.background = '#d97706';
+      }
+      const inlineBtn = spatialStage ? spatialStage.querySelector('.spatial-window[data-id="' + w.id + '"] .inline-enter-btn') : null;
+      if (inlineBtn) {
+        inlineBtn.textContent = attempts > 1 ? '⚡ RETRYING...' : '⚡ ACCEPTING...';
+        inlineBtn.style.background = '#d97706';
+      }
+
+      const entry = {
+        startedAt: Date.now(),
+        attempts,
+        timer: null,
+        retryTimer: null
+      };
+
+      entry.timer = setTimeout(async () => {
+        if (!autoAcceptIds.has(w.id) || activeAutoAccepts.get(w.id) !== entry) return;
+        console.log('[⚡ Auto-Accept] Dispatched Enter to window ' + w.id);
+        const ok = await sendAction(w.id, 'enter');
+        if (!autoAcceptIds.has(w.id) || activeAutoAccepts.get(w.id) !== entry) return;
+
+        // If focus was lost, action was busy, or prompt is still stuck, schedule a retry
+        const retryWait = ok ? AUTO_ACCEPT_RETRY_MS : 600;
+        entry.retryTimer = setTimeout(() => {
+          if (!autoAcceptIds.has(w.id) || activeAutoAccepts.get(w.id) !== entry) return;
+          const latest = currentWindows.find(win => win.id === w.id);
+          if (latest && latest.agyState && latest.agyState.actionRequired) {
+            scheduleAutoAccept(latest, 200, entry.attempts + 1);
+          } else {
+            clearAutoAcceptEntry(w.id);
+          }
+        }, retryWait);
+      }, delayMs);
+
+      activeAutoAccepts.set(w.id, entry);
+    }
+
     function checkAutoAccept(windows) {
       windows.forEach(w => {
         if (!autoAcceptIds.has(w.id)) {
-          activeAutoAccepts.delete(w.id);
+          clearAutoAcceptEntry(w.id);
           return;
         }
         const isActionRequired = w.agyState && w.agyState.actionRequired;
         if (isActionRequired) {
-          if (!activeAutoAccepts.has(w.id)) {
-            activeAutoAccepts.add(w.id);
-            console.log('[⚡ Auto-Accept] Action required on window ' + w.id + ' (' + w.name + '). Scheduling Enter...');
-
-            const enterBtn = enterDock ? enterDock.querySelector('.dock-enter-btn[data-id="' + w.id + '"] .dock-btn-action') : null;
-            if (enterBtn) {
-              enterBtn.textContent = '⚡ ACCEPTING...';
-              enterBtn.parentElement.style.background = '#d97706';
-            }
-            const inlineBtn = spatialStage ? spatialStage.querySelector('.spatial-window[data-id="' + w.id + '"] .inline-enter-btn') : null;
-            if (inlineBtn) {
-              inlineBtn.textContent = '⚡ ACCEPTING...';
-              inlineBtn.style.background = '#d97706';
-            }
-
-            // Settlement delay before auto-confirming (350ms)
-            setTimeout(() => {
-              if (!autoAcceptIds.has(w.id)) return;
-              console.log('[⚡ Auto-Accept] Dispatched Enter to window ' + w.id);
-              sendAction(w.id, 'enter');
-            }, 350);
+          const existing = activeAutoAccepts.get(w.id);
+          if (!existing) {
+            scheduleAutoAccept(w, 350, 1);
+          } else if (Date.now() - existing.startedAt >= AUTO_ACCEPT_RETRY_MS + 500 && !isActionInProgress) {
+            scheduleAutoAccept(w, 200, existing.attempts + 1);
           }
         } else {
-          activeAutoAccepts.delete(w.id);
+          clearAutoAcceptEntry(w.id);
         }
       });
     }
@@ -1616,7 +1654,7 @@
 
     // Send Key or Focus Action (with settlement debounce)
     async function sendAction(windowId, key) {
-      if (isActionInProgress) return;
+      if (isActionInProgress) return false;
       isActionInProgress = true;
       const id = parseInt(windowId, 10);
       triggerHaptic(key === 'enter' ? 24 : 12);
@@ -1629,12 +1667,15 @@
         });
         if (res.ok) {
           setKeyDispatchStage(id, 'completed');
+          return true;
         } else {
           setKeyDispatchStage(id, 'error');
+          return false;
         }
       } catch (err) {
         console.error('Failed to send key:', err);
         setKeyDispatchStage(id, 'error');
+        return false;
       } finally {
         setTimeout(() => { isActionInProgress = false; }, 160);
       }
