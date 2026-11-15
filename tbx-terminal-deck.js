@@ -85,6 +85,7 @@ function generateQrSvg(url) {
 const PORT = parseInt(process.env.PORT || '8999', 10);
 const POLL_INTERVAL_MS = 600;
 const HOSTED_URL = 'https://tbx-for-toolbox.dev/terminal-deck/';
+const API_VERSION = 1;
 
 /**
  * Build the hosted Terminal Deck URL with the ?host= parameter pointing to this daemon's LAN address.
@@ -414,13 +415,13 @@ function fetchTerminalState() {
           agyState: agyState
         };
       });
-      const state = { windows: enriched, displays: displays };
+      const state = { apiVersion: API_VERSION, windows: enriched, displays: displays };
       lastKnownGoodState = state;
       return state;
     }
-    return lastKnownGoodState && lastKnownGoodState.windows && lastKnownGoodState.windows.length ? lastKnownGoodState : { windows: [], displays: displays };
+    return lastKnownGoodState && lastKnownGoodState.windows && lastKnownGoodState.windows.length ? lastKnownGoodState : { apiVersion: API_VERSION, windows: [], displays: displays };
   } catch (err) {
-    return lastKnownGoodState && lastKnownGoodState.windows ? lastKnownGoodState : { windows: [], displays: [] };
+    return lastKnownGoodState && lastKnownGoodState.windows ? lastKnownGoodState : { apiVersion: API_VERSION, windows: [], displays: [] };
   }
 }
 
@@ -640,12 +641,14 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Endpoint: GET /info (Daemon connection URLs for QR onboarding)
+  // Endpoint: GET /info (Daemon connection URLs & API version for QR onboarding and host switching)
   if (url.pathname === '/info' && req.method === 'GET') {
     const localIp = getLocalIp();
     const hostname = os.hostname();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
+      apiVersion: API_VERSION,
+      hostname,
       port: PORT,
       localUrl: `http://localhost:${PORT}`,
       phoneUrl: getHostedPhoneUrl(localIp),
@@ -766,6 +769,7 @@ function pollAndBroadcast() {
 }
 
 module.exports = {
+  API_VERSION,
   detectAgyState,
 };
 
