@@ -8,11 +8,12 @@ Exploratory scratchpad for backlog ideas, investigative spikes, architectural in
 
 - [ ] **6. Migrate Root Scripts into `path/` and `scripts/` Directories**
   - **Idea**: Move scripts out of the repository root so primary CLI scripts (meant to be on `PATH`) live in `path/` and secondary/helper scripts (not invoked directly) live in `scripts/`.
-  - **Context**: Currently all `tbx-*.sh` and `tbx-*.js` scripts sit in the repository root alongside config and documentation files, mixing user-facing CLI entrypoints with internal/helper scripts. Separating them into `path/` and `scripts/` keeps the root clean and makes `PATH` / Homebrew packaging straightforward.
+  - **Context**: All user-facing `tbx-*.sh` and `tbx-*.js` scripts have been moved into `path/` with relative compatibility symlinks left in the repository root so existing `$PATH` setups continue to work during migration.
   - **Investigation**:
-    - [ ] Classify all root `tbx-*` scripts into primary (`path/`) vs. secondary/helper (`scripts/`).
-    - [ ] Update relative `require`/path references (e.g. [`tbx-terminal-deck.js`](tbx-terminal-deck.js) loading `website/terminal-deck/index.html`, plus `tests/terminal-deck/test.js`).
+    - [x] Move `tbx-*` scripts into `path/` and leave compatibility symlinks in root.
+    - [x] Update relative `require`/path references (e.g. [`path/tbx-terminal-deck.js`](path/tbx-terminal-deck.js), [`tests/terminal-deck/test.js`](tests/terminal-deck/test.js), and symlink-safe `SCRIPT_DIR`/`REPO_ROOT` in `path/*.sh`).
     - [ ] Update documentation and workflow references in [`AGENTS.md`](AGENTS.md), [`MORE-AGENTS.md`](MORE-AGENTS.md), and `.github/workflows/`.
+    - [ ] Remove root compatibility symlinks once `$PATH` points to `path/`.
 
 - [ ] **5. Publish `tbx` Scripts to Homebrew with `tbx <command>` Dispatcher**
   - **Idea**: Distribute `tbx` scripts via Homebrew (e.g. `brew install TarasMazepa/tbx/tbx` or `homebrew-tap`) and provide a `tbx` entrypoint so users can run `tbx <command>` (mapping to `tbx-<command>.sh` or `tbx-<command>.js`, e.g. `tbx terminal-deck`, `tbx gh-status`).
