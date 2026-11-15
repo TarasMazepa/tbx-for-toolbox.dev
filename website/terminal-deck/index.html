@@ -1123,8 +1123,45 @@
       persistSavedHosts(hosts);
     }
 
+    const HOSTED_DECK_URL = 'https://tbx-for-toolbox.dev/terminal-deck/';
     const urlParams = new URLSearchParams(window.location.search);
     const hostParam = urlParams.get('host');
+
+    function shouldCheckHostedRedirect(loc = window.location, params = urlParams) {
+      return (
+        loc.protocol === 'http:' &&
+        (loc.hostname === 'localhost' || loc.hostname === '127.0.0.1') &&
+        params.get('local') !== '1' &&
+        !params.get('host')
+      );
+    }
+
+    function buildHostedRedirectUrl(loc = window.location, params = urlParams, hostedUrl = HOSTED_DECK_URL) {
+      const target = new URL(hostedUrl);
+      target.searchParams.set('host', loc.origin);
+      const qr = params.get('qr');
+      if (qr) target.searchParams.set('qr', qr);
+      return target.toString();
+    }
+
+    async function tryRedirectToHosted() {
+      if (!shouldCheckHostedRedirect()) return;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 1500);
+      try {
+        await fetch(HOSTED_DECK_URL, {
+          method: 'HEAD',
+          mode: 'no-cors',
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+        clearTimeout(timer);
+        window.location.replace(buildHostedRedirectUrl());
+      } catch (e) {
+        clearTimeout(timer);
+      }
+    }
+    tryRedirectToHosted();
     if (hostParam) {
       const normalizedParam = normalizeHostUrl(hostParam);
       try { localStorage.setItem('terminal_deck_host', normalizedParam); } catch (e) {}

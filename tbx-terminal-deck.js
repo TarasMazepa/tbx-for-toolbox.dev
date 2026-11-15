@@ -21,6 +21,7 @@
  */
 
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -93,6 +94,55 @@ const API_VERSION = 1;
 function getHostedPhoneUrl(localIp = getLocalIp()) {
   const hostUrl = `http://${localIp}:${PORT}`;
   return `${HOSTED_URL}?host=${encodeURIComponent(hostUrl)}`;
+}
+
+/**
+ * Check whether the hosted Terminal Deck URL responds with 2xx/3xx within timeoutMs.
+ */
+function isHostedUrlReachable(targetUrl = HOSTED_URL, timeoutMs = 1500) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (ok) => {
+      if (settled) return;
+      settled = true;
+      resolve(ok);
+    };
+
+    try {
+      const parsed = new URL(targetUrl);
+      const client = parsed.protocol === 'https:' ? https : http;
+      const req = client.request(
+        parsed,
+        { method: 'HEAD', timeout: timeoutMs },
+        (res) => {
+          res.resume();
+          finish(res.statusCode >= 200 && res.statusCode < 400);
+        }
+      );
+      req.on('timeout', () => {
+        req.destroy();
+        finish(false);
+      });
+      req.on('error', () => finish(false));
+      req.end();
+    } catch (e) {
+      finish(false);
+    }
+  });
+}
+
+/**
+ * Build the desktop browser URL to open on startup.
+ */
+function getDesktopOpenUrl({ port = PORT, hostedUrl = HOSTED_URL, preferLocal = false, hostedReachable = false } = {}) {
+  const localOrigin = `http://localhost:${port}`;
+  if (preferLocal) {
+    return `${localOrigin}/?qr=1&local=1`;
+  }
+  if (hostedReachable) {
+    return `${hostedUrl}?host=${encodeURIComponent(localOrigin)}&qr=1`;
+  }
+  return `${localOrigin}/?qr=1`;
 }
 
 // Embedded minimal seamless looping MP4 video to prevent mobile screen sleep over LAN HTTP
@@ -771,6 +821,8 @@ function pollAndBroadcast() {
 module.exports = {
   API_VERSION,
   detectAgyState,
+  isHostedUrlReachable,
+  getDesktopOpenUrl,
 };
 
 if (require.main === module) {
@@ -818,8 +870,17 @@ if (require.main === module) {
 
     const shouldOpen = !process.argv.includes('--no-open') && process.env.TBX_NO_OPEN !== '1';
     if (shouldOpen) {
-      const desktopUrl = `http://localhost:${PORT}/?qr=1`;
-      execFile('open', [desktopUrl], () => {});
+      const preferLocal = process.argv.includes('--local') || process.env.TBX_LOCAL === '1';
+      (async () => {
+        const hostedReachable = preferLocal ? false : await isHostedUrlReachable(HOSTED_URL, 1500);
+        const desktopUrl = getDesktopOpenUrl({
+          port: PORT,
+          hostedUrl: HOSTED_URL,
+          preferLocal,
+          hostedReachable,
+        });
+        execFile('open', [desktopUrl], () => {});
+      })();
     }
   });
 
