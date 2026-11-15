@@ -2154,11 +2154,11 @@
           <p>${body}</p>
           ${mobile ? '' : `
             <div class="onboarding-cmd">
-              <code>./tbx-terminal-deck.js</code>
+              <code>./path/tbx-terminal-deck.js</code>
               <button type="button" class="header-btn" id="copyCmdBtn">Copy</button>
             </div>
             <div class="onboarding-actions">
-              <a class="onboarding-link" href="https://github.com/TarasMazepa/tbx-for-toolbox.dev/blob/main/tbx-terminal-deck.js" target="_blank" rel="noopener">View tbx-terminal-deck.js on GitHub ↗</a>
+              <a class="onboarding-link" href="https://github.com/TarasMazepa/tbx-for-toolbox.dev/blob/main/path/tbx-terminal-deck.js" target="_blank" rel="noopener">View tbx-terminal-deck.js on GitHub ↗</a>
             </div>
           `}
           <div class="onboarding-host-row">
@@ -2174,7 +2174,7 @@
       if (copyBtn) {
         copyBtn.addEventListener('click', async () => {
           try {
-            await navigator.clipboard.writeText('./tbx-terminal-deck.js');
+            await navigator.clipboard.writeText('./path/tbx-terminal-deck.js');
             copyBtn.textContent = 'Copied!';
             setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
           } catch (e) {}

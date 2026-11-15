@@ -20,7 +20,7 @@ All web tools, pages, and bookmarklets are hosted live at **[https://tbx-for-too
 
 ## Scripts & CLI Tools
 
-The root of the repository contains helper Bash scripts for workflow automation, git operations across multiple checkouts (configured in `till/repositories.txt`), and Antigravity CLI settings management.
+The `path/` directory contains user-facing CLI scripts (with temporary compatibility symlinks in the repository root) for workflow automation, git operations across multiple checkouts (configured in `till/repositories.txt`), and Antigravity CLI settings management.
 
 ### Multi-Repository & Git Management
 Operates across all checked-out repositories defined in `till/repositories.txt`:
