@@ -556,13 +556,14 @@ const JXA_FETCH_SCRIPT = `
       } catch(e) {}
       if (kNames && kNames.length) {
         for (let k = 0; k < kNames.length; k++) {
-          if (kMin && kMin[k] === true) continue;
+          const isMinimized = Boolean(kMin && kMin[k] === true);
           const pos = kPos[k];
           const sz = kSizes[k];
           kittySysVisible.push({
             name: kNames[k] || "",
             position: pos && Array.isArray(pos) ? { x: Math.round(pos[0]), y: Math.round(pos[1]) } : { x: 0, y: 0 },
             size: sz && Array.isArray(sz) ? { width: Math.round(sz[0]), height: Math.round(sz[1]) } : { width: 800, height: 600 },
+            minimized: isMinimized,
             used: false
           });
         }
@@ -809,9 +810,12 @@ function fetchKittyWindows(sysKittyWindows = []) {
       const matchTitle = activeTab.title || (panes[0] && panes[0].title) || '';
       let sysMatch = sysKittyWindows.find(s => !s.used && s.name && matchTitle && (s.name === matchTitle || s.name.includes(matchTitle) || matchTitle.includes(s.name)));
       if (!sysMatch) {
-        sysMatch = sysKittyWindows.find(s => !s.used);
+        sysMatch = sysKittyWindows.find(s => !s.used && !s.minimized) || sysKittyWindows.find(s => !s.used);
       }
       if (sysMatch) sysMatch.used = true;
+      if ((sysMatch && sysMatch.minimized) || (sysKittyWindows.length > 0 && !sysMatch)) {
+        continue;
+      }
 
       const basePos = sysMatch ? sysMatch.position : { x: 0, y: 0 };
       const baseSize = sysMatch ? sysMatch.size : { width: 800, height: 600 };
