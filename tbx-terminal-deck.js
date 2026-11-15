@@ -24,7 +24,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { execFileSync } = require('child_process');
+const { execFileSync, execFile } = require('child_process');
 const crypto = require('crypto');
 
 
@@ -45,6 +45,41 @@ function printQrCode(url) {
       return;
     } catch (e) {}
   }
+}
+
+/**
+ * Render an SVG QR code from tbx-qr-terminal.js ANSI output
+ */
+function generateQrSvg(url) {
+  if (!qrGenerator || typeof qrGenerator.generate !== 'function') {
+    return null;
+  }
+  let raw = '';
+  qrGenerator.generate(url, {}, out => {
+    raw = out;
+  });
+  const lines = raw.split('\n').filter(Boolean);
+  const rows = lines.map(line => {
+    const cells = [];
+    const re = /\x1B\[(40|47)m  \x1B\[0m/g;
+    let match;
+    while ((match = re.exec(line)) !== null) {
+      cells.push(match[1] === '40');
+    }
+    return cells;
+  }).filter(r => r.length > 0);
+
+  if (rows.length === 0) return null;
+  const size = rows.length;
+  const rects = [];
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < rows[y].length; x++) {
+      if (rows[y][x]) {
+        rects.push(`<rect x="${x}" y="${y}" width="1" height="1" fill="#0f172a"/>`);
+      }
+    }
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" shape-rendering="crispEdges"><rect width="${size}" height="${size}" fill="#ffffff"/>${rects.join('')}</svg>`;
 }
 
 const PORT = parseInt(process.env.PORT || '8999', 10);
@@ -593,6 +628,37 @@ const server = http.createServer(async (req, res) => {
     } else {
       res.end(NO_SLEEP_MP4_BUF);
     }
+    return;
+  }
+
+  // Endpoint: GET /info (Daemon connection URLs for QR onboarding)
+  if (url.pathname === '/info' && req.method === 'GET') {
+    const localIp = getLocalIp();
+    const hostname = os.hostname();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      port: PORT,
+      localUrl: `http://localhost:${PORT}`,
+      phoneUrl: `http://${localIp}:${PORT}`,
+      mdnsUrl: `http://${hostname}:${PORT}`,
+    }));
+    return;
+  }
+
+  // Endpoint: GET /qr.svg (SVG QR code pointing to LAN phoneUrl)
+  if (url.pathname === '/qr.svg' && req.method === 'GET') {
+    const phoneUrl = `http://${getLocalIp()}:${PORT}`;
+    const svg = generateQrSvg(phoneUrl);
+    if (!svg) {
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end('QR generator unavailable');
+      return;
+    }
+    res.writeHead(200, {
+      'Content-Type': 'image/svg+xml; charset=utf-8',
+      'Cache-Control': 'no-cache',
+    });
+    res.end(svg);
     return;
   }
 
