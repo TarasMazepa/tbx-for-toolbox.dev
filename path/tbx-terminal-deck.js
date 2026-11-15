@@ -813,22 +813,51 @@ function fetchKittyWindows(sysKittyWindows = []) {
 
     if (!Array.isArray(osWindows)) continue;
 
-    for (let osIdx = 0; osIdx < osWindows.length; osIdx++) {
-      const osWin = osWindows[osIdx];
+    // Pre-match OS windows to System Events geometry in passes so exact title matches
+    // are never stolen by substring matches (e.g. "agy" matching "agy --conversation=...").
+    const osEntries = osWindows.map((osWin, osIdx) => {
       const tabs = Array.isArray(osWin.tabs) ? osWin.tabs : [];
-      if (!tabs.length) continue;
+      const activeTab = tabs.find(t => t.is_focused || t.is_active) || tabs[0] || null;
+      const panes = activeTab && Array.isArray(activeTab.windows) ? activeTab.windows : [];
+      const matchTitle = (activeTab && activeTab.title) || (panes[0] && panes[0].title) || '';
+      return { osWin, osIdx, activeTab, panes, matchTitle, sysMatch: null };
+    }).filter(e => e.panes.length > 0);
 
-      const activeTab = tabs.find(t => t.is_focused || t.is_active) || tabs[0];
-      const panes = Array.isArray(activeTab.windows) ? activeTab.windows : [];
-      if (!panes.length) continue;
+    const matchOrder = [
+      ...osEntries.filter(e => e.osWin.is_focused || e.osWin.last_focused),
+      ...osEntries.filter(e => !(e.osWin.is_focused || e.osWin.last_focused))
+    ];
 
-      // Match OS window geometry from System Events by title, falling back to next unused window
-      const matchTitle = activeTab.title || (panes[0] && panes[0].title) || '';
-      let sysMatch = sysKittyWindows.find(s => !s.used && s.name && matchTitle && (s.name === matchTitle || s.name.includes(matchTitle) || matchTitle.includes(s.name)));
-      if (!sysMatch) {
-        sysMatch = sysKittyWindows.find(s => !s.used && !s.minimized) || sysKittyWindows.find(s => !s.used);
+    // Pass 1: exact title match
+    for (const entry of matchOrder) {
+      if (!entry.matchTitle) continue;
+      const hit = sysKittyWindows.find(s => !s.used && s.name && s.name === entry.matchTitle);
+      if (hit) {
+        hit.used = true;
+        entry.sysMatch = hit;
       }
-      if (sysMatch) sysMatch.used = true;
+    }
+    // Pass 2: substring title match
+    for (const entry of matchOrder) {
+      if (entry.sysMatch || !entry.matchTitle) continue;
+      const hit = sysKittyWindows.find(s => !s.used && s.name && (s.name.includes(entry.matchTitle) || entry.matchTitle.includes(s.name)));
+      if (hit) {
+        hit.used = true;
+        entry.sysMatch = hit;
+      }
+    }
+    // Pass 3: fallback to next unused window
+    for (const entry of matchOrder) {
+      if (entry.sysMatch) continue;
+      const hit = sysKittyWindows.find(s => !s.used && !s.minimized) || sysKittyWindows.find(s => !s.used);
+      if (hit) {
+        hit.used = true;
+        entry.sysMatch = hit;
+      }
+    }
+
+    for (const entry of osEntries) {
+      const { osWin, osIdx, activeTab, panes, sysMatch } = entry;
       if ((sysMatch && sysMatch.minimized) || (sysKittyWindows.length > 0 && !sysMatch)) {
         continue;
       }
