@@ -17,10 +17,11 @@ Exploratory scratchpad for backlog ideas, investigative spikes, architectural in
 
 - [ ] **5. Publish `tbx` Scripts to Homebrew with `tbx <command>` Dispatcher**
   - **Idea**: Distribute `tbx` scripts via Homebrew (e.g. `brew install TarasMazepa/tbx/tbx` or `homebrew-tap`) and provide a `tbx` entrypoint so users can run `tbx <command>` (mapping to `tbx-<command>.sh` or `tbx-<command>.js`, e.g. `tbx terminal-deck`, `tbx gh-status`).
-  - **Context**: Currently scripts live in the repo root as `tbx-*.sh` and `tbx-*.js` and require cloning the repo or adding it to `PATH`. A `tbx` dispatcher + Homebrew formula makes them installable globally in one command and also gives a clean `npx`-free command (e.g. `tbx terminal-deck`) to reference in the Terminal Deck onboarding UI.
+  - **Context**: Currently scripts live in `path/` as `tbx-*.sh` and `tbx-*.js` (with temporary root compatibility symlinks) and require cloning the repo and adding `path/` to `PATH`. A `tbx` dispatcher + Homebrew formula makes them installable globally in one command, supports dynamic shell completions (`zsh`/`bash`), and gives a clean `npx`-free command (e.g. `tbx terminal-deck`) to reference in the Terminal Deck onboarding UI.
   - **Investigation**:
-    - [ ] Design a lightweight `tbx` dispatcher script that lists available `tbx-*` commands, forwards arguments to `tbx-<command>.sh` / `tbx-<command>.js`, and handles `tbx --help` / `tbx <command> --help`.
-    - [ ] Verify relative resource paths work when installed in Homebrew's `libexec` / `share` (e.g. [`tbx-terminal-deck.js`](tbx-terminal-deck.js) reading `website/terminal-deck/index.html`, and `tbx-*.sh` scripts invoked from any directory).
+    - [ ] Design a lightweight `path/tbx` dispatcher script that lists available `tbx-*` commands, forwards arguments to `tbx-<command>.sh` / `tbx-<command>.js`, and handles `tbx --help` / `tbx <command> --help`.
+    - [ ] Add `tbx --commands` (dynamic subcommand listing) and `tbx completion zsh|bash` (supporting local `eval "$(tbx completion zsh)"` and Homebrew's `generate_completions_from_executable(bin/"tbx", "completion")`).
+    - [ ] Verify relative resource paths work when installed in Homebrew's `libexec` / `share` (e.g. [`path/tbx-terminal-deck.js`](path/tbx-terminal-deck.js) reading `website/terminal-deck/index.html`, and `tbx-*.sh` scripts invoked from any directory with config fallback like `~/.config/tbx/`).
     - [ ] Set up a Homebrew formula / tap and release automation (e.g. GitHub Actions updating the formula on tag/release).
 
 ---
