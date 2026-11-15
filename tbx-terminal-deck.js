@@ -729,10 +729,18 @@ if (require.main === module) {
     console.log(`======================================================`);
     console.log(`Endpoints:`);
     console.log(`  • GET  /          -> 100% Spatial Multi-Monitor Controller`);
+    console.log(`  • GET  /info      -> Local & LAN connection URLs`);
+    console.log(`  • GET  /qr.svg    -> Mobile QR code SVG`);
     console.log(`  • GET  /terminals -> JSON snapshot of open windows`);
     console.log(`  • GET  /events    -> Real-time SSE reactive stream`);
     console.log(`  • POST /api/key   -> Focus window & inject keystroke`);
     console.log(`======================================================\n`);
+
+    const shouldOpen = !process.argv.includes('--no-open') && process.env.TBX_NO_OPEN !== '1';
+    if (shouldOpen) {
+      const desktopUrl = `http://localhost:${PORT}/?qr=1`;
+      execFile('open', [desktopUrl], () => {});
+    }
   });
 
   // Clean and instant shutdown on Ctrl+C (SIGINT) or SIGTERM
