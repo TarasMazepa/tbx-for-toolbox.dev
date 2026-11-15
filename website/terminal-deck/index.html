@@ -67,8 +67,13 @@
       display: flex;
       align-items: center;
       gap: 6px;
+      min-width: 0;
+    }
+    .header-info::-webkit-scrollbar {
+      display: none;
     }
     .status-badge {
+      flex: 0 0 auto;
       display: flex;
       align-items: center;
       gap: 5px;
@@ -77,6 +82,20 @@
       border-radius: 9999px;
       background: #2e2c3b;
       color: var(--text-muted);
+      white-space: nowrap;
+    }
+    @media (max-width: 720px) {
+      header {
+        flex-wrap: wrap;
+        gap: 6px 8px;
+      }
+      .header-info {
+        flex: 1 1 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        padding-bottom: 2px;
+      }
     }
     .status-dot {
       width: 6px;
@@ -1059,6 +1078,10 @@
 
   <script>
     const FRONTEND_API_VERSION = 1;
+    const RAW_FRONTEND_COMMIT_TS = '__COMMIT_TIMESTAMP__';
+    const FRONTEND_COMMIT_TS = /^\d+$/.test(RAW_FRONTEND_COMMIT_TS) ? parseInt(RAW_FRONTEND_COMMIT_TS, 10) : null;
+    const RAW_FRONTEND_COMMIT_SHORT = '__COMMIT_SHORT__';
+    const FRONTEND_COMMIT_SHORT = /^__.*__$/.test(RAW_FRONTEND_COMMIT_SHORT) ? null : (RAW_FRONTEND_COMMIT_SHORT || null);
     const HOSTS_STORAGE_KEY = 'terminal_deck_hosts';
 
     function normalizeHostUrl(raw) {
@@ -2122,7 +2145,7 @@
     const versionRefreshBtn = document.getElementById('versionRefreshBtn');
     const versionDismissBtn = document.getElementById('versionDismissBtn');
 
-    function getVersionStatus(backendVersion) {
+    function getVersionStatus(backendVersion, backendCommitTs = null, backendCommitShort = null) {
       if (backendVersion === null || backendVersion === undefined) {
         return { compatible: true, state: 'unknown', message: '' };
       }
@@ -2140,12 +2163,30 @@
           message: `Frontend outdated (API v${FRONTEND_API_VERSION}, backend is v${backendVersion}) — refresh this page or update your frontend.`
         };
       }
+      if (FRONTEND_COMMIT_TS !== null && typeof backendCommitTs === 'number') {
+        const feLabel = FRONTEND_COMMIT_SHORT || String(FRONTEND_COMMIT_TS);
+        const beLabel = backendCommitShort || String(backendCommitTs);
+        if (backendCommitTs < FRONTEND_COMMIT_TS) {
+          return {
+            compatible: false,
+            state: 'backend-outdated',
+            message: `Server is on an older commit (${beLabel} vs ${feLabel}) — update or restart tbx-terminal-deck.js on your Mac.`
+          };
+        }
+        if (backendCommitTs > FRONTEND_COMMIT_TS) {
+          return {
+            compatible: false,
+            state: 'frontend-outdated',
+            message: `Frontend is on an older commit (${feLabel} vs ${beLabel}) — refresh this page.`
+          };
+        }
+      }
       return { compatible: true, state: 'ok', message: `API v${backendVersion}` };
     }
 
-    function updateVersionBanner(backendVersion) {
+    function updateVersionBanner(backendVersion, backendCommitTs = null, backendCommitShort = null) {
       if (!versionBanner || !versionBannerText) return;
-      const status = getVersionStatus(backendVersion);
+      const status = getVersionStatus(backendVersion, backendCommitTs, backendCommitShort);
       if (status.compatible || versionDismissed) {
         versionBanner.hidden = true;
       } else {
@@ -2286,13 +2327,15 @@
         if (!res.ok) return;
         const info = await res.json();
         const backendVersion = typeof info.apiVersion === 'number' ? info.apiVersion : 0;
-        connectedHostInfo = { ...info, apiVersion: backendVersion };
+        const backendCommitTs = typeof info.commitTimestamp === 'number' ? info.commitTimestamp : null;
+        const backendCommitShort = info.commitShort || null;
+        connectedHostInfo = { ...info, apiVersion: backendVersion, commitTimestamp: backendCommitTs, commitShort: backendCommitShort };
         saveHostEntry(effectiveUrl, {
           hostname: info.hostname || '',
           apiVersion: backendVersion,
           lastConnectedAt: Date.now(),
         });
-        updateVersionBanner(backendVersion);
+        updateVersionBanner(backendVersion, backendCommitTs, backendCommitShort);
         if (hostsModal && !hostsModal.hidden) renderHostsModal();
       } catch (e) {}
     }
@@ -2319,7 +2362,11 @@
             return;
           }
           if (data && !Array.isArray(data) && typeof data.apiVersion === 'number' && !connectedHostInfo) {
-            updateVersionBanner(data.apiVersion);
+            updateVersionBanner(
+              data.apiVersion,
+              typeof data.commitTimestamp === 'number' ? data.commitTimestamp : null,
+              data.commitShort || null
+            );
           }
           currentWindows = Array.isArray(data) ? data : (data && data.windows ? data.windows : []);
           currentDisplays = Array.isArray(data) ? [] : (data && data.displays ? data.displays : []);

@@ -340,6 +340,22 @@ const POLL_INTERVAL_MS = 600;
 const HOSTED_URL = 'https://tbx-for-toolbox.dev/terminal-deck/';
 const API_VERSION = 1;
 
+function getServerCommitInfo() {
+  try {
+    const out = execFileSync('git', ['-C', __dirname, 'show', '-s', '--format=%ct:%h', 'HEAD'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: 1000
+    }).trim();
+    const [tsStr, shortSha] = out.split(':');
+    const ts = /^\d+$/.test(tsStr) ? parseInt(tsStr, 10) : null;
+    return { timestamp: ts, short: shortSha || null };
+  } catch (_) {
+    return { timestamp: null, short: null };
+  }
+}
+const SERVER_COMMIT_INFO = getServerCommitInfo();
+
 /**
  * Build the hosted Terminal Deck URL with the ?host= parameter pointing to this daemon's LAN address.
  */
@@ -912,13 +928,23 @@ function fetchTerminalState() {
           agyState: agyState
         };
       });
-      const state = { apiVersion: API_VERSION, windows: enriched, displays: displays };
+      const state = {
+        apiVersion: API_VERSION,
+        commitTimestamp: SERVER_COMMIT_INFO.timestamp,
+        commitShort: SERVER_COMMIT_INFO.short,
+        windows: enriched,
+        displays: displays
+      };
       lastKnownGoodState = state;
       return state;
     }
-    return lastKnownGoodState && lastKnownGoodState.windows && lastKnownGoodState.windows.length ? lastKnownGoodState : { apiVersion: API_VERSION, windows: [], displays: displays };
+    return lastKnownGoodState && lastKnownGoodState.windows && lastKnownGoodState.windows.length
+      ? lastKnownGoodState
+      : { apiVersion: API_VERSION, commitTimestamp: SERVER_COMMIT_INFO.timestamp, commitShort: SERVER_COMMIT_INFO.short, windows: [], displays: displays };
   } catch (err) {
-    return lastKnownGoodState && lastKnownGoodState.windows ? lastKnownGoodState : { apiVersion: API_VERSION, windows: [], displays: [] };
+    return lastKnownGoodState && lastKnownGoodState.windows
+      ? lastKnownGoodState
+      : { apiVersion: API_VERSION, commitTimestamp: SERVER_COMMIT_INFO.timestamp, commitShort: SERVER_COMMIT_INFO.short, windows: [], displays: [] };
   }
 }
 
@@ -1171,7 +1197,13 @@ function readJsonBody(req) {
 // Embedded 100% Spatial Multi-Monitor Web App HTML with Ambient Lighting & Muted/Lit Controls
 const HTML_APP_PATH = path.join(__dirname, '..', 'website', 'terminal-deck', 'index.html');
 function getHtmlApp() {
-  return fs.readFileSync(HTML_APP_PATH, 'utf8');
+  let html = fs.readFileSync(HTML_APP_PATH, 'utf8');
+  if (SERVER_COMMIT_INFO.timestamp !== null) {
+    html = html
+      .replace(/__COMMIT_TIMESTAMP__/g, String(SERVER_COMMIT_INFO.timestamp))
+      .replace(/__COMMIT_SHORT__/g, SERVER_COMMIT_INFO.short || '');
+  }
+  return html;
 }
 
 // HTTP Server
@@ -1219,6 +1251,8 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       apiVersion: API_VERSION,
+      commitTimestamp: SERVER_COMMIT_INFO.timestamp,
+      commitShort: SERVER_COMMIT_INFO.short,
       hostname,
       port: PORT,
       localUrl: `http://localhost:${PORT}`,
