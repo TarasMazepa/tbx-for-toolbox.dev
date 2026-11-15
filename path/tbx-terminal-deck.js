@@ -788,18 +788,32 @@ function injectKey(windowId, key) {
       delay(0.15);
     }
 
-    // 3. Dispatch keystroke
-    sys.keyCode(${code});
+    // Re-verify target window still has focus right before dispatching keystroke
+    let stillFocused = false;
+    try {
+      const isTerminalFront = terminal.frontmost();
+      const targetWin = terminal.windows.byId(${windowId});
+      stillFocused = !!(isTerminalFront && targetWin && targetWin.index() === 1);
+    } catch(e) {}
 
-    if (!alreadyFocused) {
-      // 4. Brief pause to ensure the key event is queued/consumed before focus switch
-      delay(0.08);
+    let keyDispatched = false;
+    if (stillFocused) {
+      // 3. Dispatch keystroke
+      sys.keyCode(${code});
+      keyDispatched = true;
+
+      if (!alreadyFocused) {
+        // 4. Brief pause to ensure the key event is queued/consumed before focus switch
+        delay(0.08);
+      }
+    } else {
+      focusConfirmed = false;
     }
-    ` : 'focusConfirmed = true;'}
+    ` : 'focusConfirmed = true; const keyDispatched = true;'}
 
     // 5. Automatically restore focus back if this was a keystroke and focus changed
     ${!isExplicitFocus ? `
-    if (!alreadyFocused) {
+    if (!alreadyFocused && keyDispatched) {
       try {
         if (frontAppName && frontAppName !== "Terminal") {
           Application(frontAppName).activate();
@@ -812,13 +826,14 @@ function injectKey(windowId, key) {
     ` : ''}
 
     JSON.stringify({
-      success: true,
+      success: keyDispatched,
+      focusLost: !keyDispatched,
       focusConfirmed: focusConfirmed,
       windowId: ${windowId},
       key: "${normalizedKey}",
       frontAppName: frontAppName,
       prevWindowId: prevWindowId,
-      restoredFocus: ${!isExplicitFocus}
+      restoredFocus: ${!isExplicitFocus} && keyDispatched
     });
   `;
 
@@ -1028,6 +1043,17 @@ const server = http.createServer(async (req, res) => {
       }
 
       const result = injectKey(windowId, key);
+      if (!result.success) {
+        console.log(`[⚠️] Focus lost before dispatching key "${key || 'focus'}" to window ${windowId}`);
+        if (sseClients.size > 0) {
+          broadcast(JSON.stringify({ type: 'key_status', windowId: targetWindowId, key: targetKey, stage: 'error', error: 'Focus lost before keystroke' }));
+        }
+        setTimeout(pollAndBroadcast, 150);
+        res.writeHead(409, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+        return;
+      }
+
       const restored = result.restoredFocus ? ` (restored focus to ${result.frontAppName || 'window ' + result.prevWindowId})` : '';
       console.log(`[⌨️] Dispatched key "${key || 'focus'}" to window ${windowId}${restored}`);
 
