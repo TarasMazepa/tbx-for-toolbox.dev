@@ -839,6 +839,148 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+    .version-banner {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 6px 12px;
+      background: rgba(245, 158, 11, 0.14);
+      border-bottom: 1px solid rgba(245, 158, 11, 0.45);
+      color: #fde68a;
+      font-size: 0.78rem;
+      line-height: 1.35;
+      z-index: 1900;
+    }
+    .version-banner[hidden] {
+      display: none;
+    }
+    .version-banner-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .hosts-modal {
+      max-width: 440px;
+      text-align: left;
+    }
+    .hosts-modal h2 {
+      text-align: center;
+    }
+    .hosts-summary {
+      background: #020617;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin-bottom: 12px;
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .hosts-summary-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .hosts-summary-url {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      color: #e2e8f0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .hosts-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 240px;
+      overflow-y: auto;
+      margin-bottom: 12px;
+    }
+    .host-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: #020617;
+      border: 1px solid var(--card-border);
+    }
+    .host-item.is-active {
+      border-color: var(--accent);
+      background: rgba(8, 47, 73, 0.35);
+    }
+    .host-item-main {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      flex: 1 1 0;
+    }
+    .host-item-info {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .host-item-title {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .host-item-url {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .host-item-badge {
+      font-size: 0.64rem;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 9999px;
+      background: #1e293b;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    .host-item-badge.ok {
+      background: rgba(34, 197, 94, 0.15);
+      color: #4ade80;
+    }
+    .host-item-badge.warn {
+      background: rgba(245, 158, 11, 0.2);
+      color: #fbbf24;
+    }
+    .host-item-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+    .status-dot.checking {
+      background: #f59e0b;
+    }
+    .hosts-empty {
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      padding: 12px 0;
+    }
+    .hosts-modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 12px;
+    }
   </style>
 </head>
 <body>
@@ -857,11 +999,20 @@
         <span id="statusText">Connecting</span>
       </div>
       <div class="status-badge" id="windowCount">0 windows</div>
+      <button type="button" class="header-btn" id="hostsBtn" title="Saved API hosts">🔌 Hosts</button>
       <button type="button" class="header-btn" id="qrBtn" title="Show mobile QR code">📱 QR</button>
       <button type="button" class="header-btn" id="dockPosBtn" title="Move Enter dock (Edge / Bottom / Top / Left / Right / Inline)">◫ Edge</button>
       <button type="button" class="header-btn" id="fullscreenBtn" title="Toggle fullscreen">⛶ Full</button>
     </div>
   </header>
+
+  <div class="version-banner" id="versionBanner" hidden>
+    <span id="versionBannerText"></span>
+    <div class="version-banner-actions">
+      <button type="button" class="header-btn" id="versionRefreshBtn" hidden>↻ Refresh</button>
+      <button type="button" class="header-btn" id="versionDismissBtn" title="Dismiss">✕</button>
+    </div>
+  </div>
 
   <button type="button" class="header-btn immersive-exit-btn" id="immersiveExitBtn" title="Exit fullscreen">✕ Exit</button>
 
@@ -891,18 +1042,104 @@
     </div>
   </div>
 
+  <div class="qr-modal-backdrop" id="hostsModal" hidden>
+    <div class="qr-modal hosts-modal" role="dialog" aria-modal="true" aria-labelledby="hostsModalTitle">
+      <h2 id="hostsModalTitle">🔌 API Hosts</h2>
+      <div class="hosts-summary" id="hostsSummary"></div>
+      <div class="hosts-list" id="hostsList"></div>
+      <div class="onboarding-host-row">
+        <input type="text" class="onboarding-input" id="modalHostInput" placeholder="http://192.168.1.x:8999">
+        <button type="button" class="header-btn" id="modalHostConnectBtn">Connect</button>
+      </div>
+      <div class="hosts-modal-footer">
+        <button type="button" class="header-btn" id="hostsCloseBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
   <script>
+    const FRONTEND_API_VERSION = 1;
+    const HOSTS_STORAGE_KEY = 'terminal_deck_hosts';
+
+    function normalizeHostUrl(raw) {
+      const trimmed = (raw || '').trim();
+      if (!trimmed) return '';
+      const withScheme = (trimmed.startsWith('http://') || trimmed.startsWith('https://'))
+        ? trimmed
+        : `http://${trimmed}`;
+      return withScheme.replace(/\/+$/, '');
+    }
+
+    function loadSavedHosts() {
+      try {
+        const raw = JSON.parse(localStorage.getItem(HOSTS_STORAGE_KEY) || '[]');
+        if (!Array.isArray(raw)) return [];
+        const seen = new Set();
+        const hosts = [];
+        for (const item of raw) {
+          const url = normalizeHostUrl(typeof item === 'string' ? item : item && item.url);
+          if (!url || seen.has(url)) continue;
+          seen.add(url);
+          hosts.push({
+            url,
+            hostname: item && typeof item.hostname === 'string' ? item.hostname : '',
+            apiVersion: typeof (item && item.apiVersion) === 'number' ? item.apiVersion : null,
+            lastConnectedAt: typeof (item && item.lastConnectedAt) === 'number' ? item.lastConnectedAt : 0,
+          });
+        }
+        return hosts;
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function persistSavedHosts(hosts) {
+      try {
+        localStorage.setItem(HOSTS_STORAGE_KEY, JSON.stringify(hosts));
+      } catch (e) {}
+    }
+
+    function saveHostEntry(rawUrl, meta = {}) {
+      const url = normalizeHostUrl(rawUrl);
+      if (!url) return;
+      const hosts = loadSavedHosts();
+      const idx = hosts.findIndex(h => h.url === url);
+      const existing = idx >= 0 ? hosts[idx] : { url, hostname: '', apiVersion: null, lastConnectedAt: 0 };
+      const updated = {
+        url,
+        hostname: meta.hostname !== undefined ? meta.hostname : existing.hostname,
+        apiVersion: meta.apiVersion !== undefined ? meta.apiVersion : existing.apiVersion,
+        lastConnectedAt: meta.lastConnectedAt !== undefined ? meta.lastConnectedAt : existing.lastConnectedAt,
+      };
+      if (idx >= 0) hosts.splice(idx, 1);
+      hosts.unshift(updated);
+      hosts.sort((a, b) => (b.lastConnectedAt || 0) - (a.lastConnectedAt || 0));
+      persistSavedHosts(hosts);
+    }
+
+    function removeSavedHost(rawUrl) {
+      const url = normalizeHostUrl(rawUrl);
+      const hosts = loadSavedHosts().filter(h => h.url !== url);
+      persistSavedHosts(hosts);
+    }
+
     const urlParams = new URLSearchParams(window.location.search);
     const hostParam = urlParams.get('host');
     if (hostParam) {
-      try { localStorage.setItem('terminal_deck_host', hostParam); } catch (e) {}
+      const normalizedParam = normalizeHostUrl(hostParam);
+      try { localStorage.setItem('terminal_deck_host', normalizedParam); } catch (e) {}
+      saveHostEntry(normalizedParam);
     }
     const rawHost = hostParam || (() => {
       try { return localStorage.getItem('terminal_deck_host') || ''; } catch (e) { return ''; }
     })();
     const apiBase = rawHost
-      ? (rawHost.startsWith('http://') || rawHost.startsWith('https://') ? rawHost : `http://${rawHost}`).replace(/\/+$/, '')
+      ? normalizeHostUrl(rawHost)
       : (window.location.protocol === 'https:' ? 'http://localhost:8999' : '');
+
+    function getEffectiveHostUrl() {
+      return normalizeHostUrl(apiBase || window.location.origin);
+    }
 
     let currentWindows = [];
     let currentDisplays = [];
@@ -1783,6 +2020,61 @@
 
     // Connect Server-Sent Events (SSE)
     let hasConnectedOnce = false;
+    let isSseConnected = false;
+    let connectedHostInfo = null;
+    let versionDismissed = false;
+
+    const versionBanner = document.getElementById('versionBanner');
+    const versionBannerText = document.getElementById('versionBannerText');
+    const versionRefreshBtn = document.getElementById('versionRefreshBtn');
+    const versionDismissBtn = document.getElementById('versionDismissBtn');
+
+    function getVersionStatus(backendVersion) {
+      if (backendVersion === null || backendVersion === undefined) {
+        return { compatible: true, state: 'unknown', message: '' };
+      }
+      if (backendVersion < FRONTEND_API_VERSION) {
+        return {
+          compatible: false,
+          state: 'backend-outdated',
+          message: `Backend outdated (API v${backendVersion}, frontend expects v${FRONTEND_API_VERSION}) — update tbx-terminal-deck.js on your Mac.`
+        };
+      }
+      if (backendVersion > FRONTEND_API_VERSION) {
+        return {
+          compatible: false,
+          state: 'frontend-outdated',
+          message: `Frontend outdated (API v${FRONTEND_API_VERSION}, backend is v${backendVersion}) — refresh this page or update your frontend.`
+        };
+      }
+      return { compatible: true, state: 'ok', message: `API v${backendVersion}` };
+    }
+
+    function updateVersionBanner(backendVersion) {
+      if (!versionBanner || !versionBannerText) return;
+      const status = getVersionStatus(backendVersion);
+      if (status.compatible || versionDismissed) {
+        versionBanner.hidden = true;
+      } else {
+        versionBannerText.textContent = `⚠️ ${status.message}`;
+        if (versionRefreshBtn) {
+          versionRefreshBtn.hidden = status.state !== 'frontend-outdated';
+        }
+        versionBanner.hidden = false;
+      }
+      handleResize();
+    }
+
+    if (versionRefreshBtn) {
+      versionRefreshBtn.addEventListener('click', () => window.location.reload());
+    }
+    if (versionDismissBtn) {
+      versionDismissBtn.addEventListener('click', () => {
+        versionDismissed = true;
+        if (versionBanner) versionBanner.hidden = true;
+        handleResize();
+      });
+    }
 
     function isMobileDevice() {
       return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
@@ -1790,9 +2082,11 @@
     }
 
     function saveHostAndReload(nextHost) {
+      const normalized = normalizeHostUrl(nextHost);
       try {
-        if (nextHost) {
-          localStorage.setItem('terminal_deck_host', nextHost.trim());
+        if (normalized) {
+          localStorage.setItem('terminal_deck_host', normalized);
+          saveHostEntry(normalized);
         } else {
           localStorage.removeItem('terminal_deck_host');
         }
@@ -1809,6 +2103,7 @@
 
       const targetLabel = apiBase || window.location.origin;
       const mobile = isMobileDevice();
+      const otherSavedHosts = loadSavedHosts().filter(h => h.url !== getEffectiveHostUrl());
       const title = mobile
         ? '📱 Open on your Mac first'
         : '💻 Local daemon not detected';
@@ -1833,6 +2128,7 @@
             <input type="text" class="onboarding-input" id="hostInput" value="${escapeHtml(apiBase)}" placeholder="http://localhost:8999">
             <button type="button" class="header-btn" id="hostSaveBtn">Connect</button>
             ${rawHost ? '<button type="button" class="header-btn" id="hostResetBtn">Reset</button>' : ''}
+            ${otherSavedHosts.length ? `<button type="button" class="header-btn" id="onboardingHostsBtn">Hosts (${otherSavedHosts.length})</button>` : ''}
           </div>
         </div>
       `;
@@ -1861,6 +2157,29 @@
       if (hostResetBtn) {
         hostResetBtn.addEventListener('click', () => saveHostAndReload(''));
       }
+
+      const onboardingHostsBtn = document.getElementById('onboardingHostsBtn');
+      if (onboardingHostsBtn) {
+        onboardingHostsBtn.addEventListener('click', openHostsModal);
+      }
+    }
+
+    async function fetchConnectedHostInfo() {
+      const effectiveUrl = getEffectiveHostUrl();
+      try {
+        const res = await fetch(`${apiBase}/info`);
+        if (!res.ok) return;
+        const info = await res.json();
+        const backendVersion = typeof info.apiVersion === 'number' ? info.apiVersion : 0;
+        connectedHostInfo = { ...info, apiVersion: backendVersion };
+        saveHostEntry(effectiveUrl, {
+          hostname: info.hostname || '',
+          apiVersion: backendVersion,
+          lastConnectedAt: Date.now(),
+        });
+        updateVersionBanner(backendVersion);
+        if (hostsModal && !hostsModal.hidden) renderHostsModal();
+      } catch (e) {}
     }
 
     function connectSSE() {
@@ -1868,9 +2187,13 @@
 
       evtSource.onopen = () => {
         hasConnectedOnce = true;
+        isSseConnected = true;
         statusDot.className = 'status-dot online';
         statusText.textContent = 'Live';
         enableKeepAwake();
+        saveHostEntry(getEffectiveHostUrl(), { lastConnectedAt: Date.now() });
+        fetchConnectedHostInfo();
+        if (hostsModal && !hostsModal.hidden) renderHostsModal();
       };
 
       evtSource.onmessage = (event) => {
@@ -1879,6 +2202,9 @@
           if (data && data.type === 'key_status') {
             setKeyDispatchStage(data.windowId, data.stage);
             return;
+          }
+          if (data && !Array.isArray(data) && typeof data.apiVersion === 'number' && !connectedHostInfo) {
+            updateVersionBanner(data.apiVersion);
           }
           currentWindows = Array.isArray(data) ? data : (data && data.windows ? data.windows : []);
           currentDisplays = Array.isArray(data) ? [] : (data && data.displays ? data.displays : []);
@@ -1890,15 +2216,194 @@
       };
 
       evtSource.onerror = () => {
+        isSseConnected = false;
         statusDot.className = 'status-dot';
         statusText.textContent = 'Reconnecting';
         renderDisconnectedOnboarding();
+        if (hostsModal && !hostsModal.hidden) renderHostsModal();
         evtSource.close();
         setTimeout(connectSSE, 2000);
       };
     }
 
     connectSSE();
+
+    // API Hosts modal
+    const hostsBtn = document.getElementById('hostsBtn');
+    const hostsModal = document.getElementById('hostsModal');
+    const hostsSummary = document.getElementById('hostsSummary');
+    const hostsList = document.getElementById('hostsList');
+    const modalHostInput = document.getElementById('modalHostInput');
+    const modalHostConnectBtn = document.getElementById('modalHostConnectBtn');
+    const hostsCloseBtn = document.getElementById('hostsCloseBtn');
+    const hostProbeResults = new Map();
+
+    async function probeHost(url) {
+      hostProbeResults.set(url, { status: 'checking' });
+      renderHostsList();
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 1500);
+      try {
+        const res = await fetch(`${url}/info`, { signal: controller.signal });
+        clearTimeout(timer);
+        if (!res.ok) {
+          hostProbeResults.set(url, { status: 'offline' });
+        } else {
+          const info = await res.json();
+          const apiVersion = typeof info.apiVersion === 'number' ? info.apiVersion : 0;
+          const hostname = info.hostname || '';
+          hostProbeResults.set(url, { status: 'online', apiVersion, hostname });
+          saveHostEntry(url, { hostname, apiVersion });
+        }
+      } catch (e) {
+        clearTimeout(timer);
+        hostProbeResults.set(url, { status: 'offline' });
+      }
+      if (hostsModal && !hostsModal.hidden) renderHostsList();
+    }
+
+    function renderHostsSummary() {
+      if (!hostsSummary) return;
+      const effectiveUrl = getEffectiveHostUrl();
+      const stateLabel = isSseConnected ? 'Connected (Live)' : 'Disconnected';
+      const backendVersion = connectedHostInfo ? connectedHostInfo.apiVersion : null;
+      const verStatus = getVersionStatus(backendVersion);
+      const versionBadge = backendVersion === null
+        ? `Frontend API v${FRONTEND_API_VERSION}`
+        : (verStatus.compatible
+          ? `<span class="host-item-badge ok">API v${backendVersion} (Up to date)</span>`
+          : `<span class="host-item-badge warn">${escapeHtml(verStatus.state === 'backend-outdated' ? `Backend v${backendVersion} < v${FRONTEND_API_VERSION}` : `Frontend v${FRONTEND_API_VERSION} < v${backendVersion}`)}</span>`);
+
+      hostsSummary.innerHTML = `
+        <div class="hosts-summary-row">
+          <span>Current host</span>
+          <span>${stateLabel}</span>
+        </div>
+        <div class="hosts-summary-row">
+          <span class="hosts-summary-url">${escapeHtml(effectiveUrl)}</span>
+          <span>${versionBadge}</span>
+        </div>
+      `;
+    }
+
+    function renderHostsList() {
+      if (!hostsList) return;
+      const effectiveUrl = getEffectiveHostUrl();
+      const saved = loadSavedHosts();
+      if (!saved.some(h => h.url === effectiveUrl)) {
+        saved.unshift({
+          url: effectiveUrl,
+          hostname: connectedHostInfo && connectedHostInfo.hostname ? connectedHostInfo.hostname : '',
+          apiVersion: connectedHostInfo ? connectedHostInfo.apiVersion : null,
+          lastConnectedAt: 0,
+        });
+      }
+
+      if (saved.length === 0) {
+        hostsList.innerHTML = '<div class="hosts-empty">No saved hosts yet.</div>';
+        return;
+      }
+
+      hostsList.innerHTML = '';
+      for (const host of saved) {
+        const isActive = host.url === effectiveUrl;
+        const probe = hostProbeResults.get(host.url);
+        let dotClass = 'status-dot';
+        if (isActive) {
+          dotClass = isSseConnected ? 'status-dot online' : 'status-dot';
+        } else if (probe) {
+          if (probe.status === 'online') dotClass = 'status-dot online';
+          else if (probe.status === 'checking') dotClass = 'status-dot checking';
+        }
+
+        const displayVersion = isActive && connectedHostInfo
+          ? connectedHostInfo.apiVersion
+          : (probe && typeof probe.apiVersion === 'number' ? probe.apiVersion : host.apiVersion);
+        const displayName = (isActive && connectedHostInfo && connectedHostInfo.hostname)
+          || (probe && probe.hostname)
+          || host.hostname
+          || host.url;
+
+        const verStatus = getVersionStatus(displayVersion);
+        const verBadgeHtml = typeof displayVersion === 'number'
+          ? `<span class="host-item-badge ${verStatus.compatible ? 'ok' : 'warn'}">API v${displayVersion}</span>`
+          : '';
+
+        const row = document.createElement('div');
+        row.className = `host-item${isActive ? ' is-active' : ''}`;
+        row.innerHTML = `
+          <div class="host-item-main">
+            <div class="${dotClass}"></div>
+            <div class="host-item-info">
+              <div class="host-item-title">
+                <span>${escapeHtml(displayName)}</span>
+                ${verBadgeHtml}
+              </div>
+              <div class="host-item-url">${escapeHtml(host.url)}</div>
+            </div>
+          </div>
+          <div class="host-item-actions">
+            ${isActive
+              ? `<span class="host-item-badge ${isSseConnected ? 'ok' : ''}">${isSseConnected ? 'Connected' : 'Active'}</span>`
+              : `<button type="button" class="header-btn host-switch-btn">Switch</button>
+                 <button type="button" class="header-btn host-remove-btn" title="Remove host">✕</button>`}
+          </div>
+        `;
+
+        const switchBtn = row.querySelector('.host-switch-btn');
+        if (switchBtn) {
+          switchBtn.addEventListener('click', () => saveHostAndReload(host.url));
+        }
+        const removeBtn = row.querySelector('.host-remove-btn');
+        if (removeBtn) {
+          removeBtn.addEventListener('click', () => {
+            removeSavedHost(host.url);
+            hostProbeResults.delete(host.url);
+            renderHostsList();
+          });
+        }
+        hostsList.appendChild(row);
+      }
+    }
+
+    function renderHostsModal() {
+      renderHostsSummary();
+      renderHostsList();
+    }
+
+    function openHostsModal() {
+      if (!hostsModal) return;
+      hostsModal.hidden = false;
+      renderHostsModal();
+      const effectiveUrl = getEffectiveHostUrl();
+      for (const host of loadSavedHosts()) {
+        if (host.url !== effectiveUrl) {
+          probeHost(host.url);
+        }
+      }
+    }
+
+    function closeHostsModal() {
+      if (hostsModal) hostsModal.hidden = true;
+    }
+
+    if (hostsBtn) hostsBtn.addEventListener('click', openHostsModal);
+    if (hostsCloseBtn) hostsCloseBtn.addEventListener('click', closeHostsModal);
+    if (hostsModal) {
+      hostsModal.addEventListener('click', (e) => {
+        if (e.target === hostsModal) closeHostsModal();
+      });
+    }
+    if (modalHostConnectBtn && modalHostInput) {
+      modalHostConnectBtn.addEventListener('click', () => {
+        if (modalHostInput.value.trim()) saveHostAndReload(modalHostInput.value);
+      });
+      modalHostInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && modalHostInput.value.trim()) {
+          saveHostAndReload(modalHostInput.value);
+        }
+      });
+    }
 
     // Mobile QR modal
     const qrBtn = document.getElementById('qrBtn');
@@ -1935,7 +2440,10 @@
       });
     }
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && qrModal && !qrModal.hidden) closeQrModal();
+      if (e.key === 'Escape') {
+        if (qrModal && !qrModal.hidden) closeQrModal();
+        if (hostsModal && !hostsModal.hidden) closeHostsModal();
+      }
     });
     if (qrCopyBtn && qrUrlText) {
       qrCopyBtn.addEventListener('click', async () => {
