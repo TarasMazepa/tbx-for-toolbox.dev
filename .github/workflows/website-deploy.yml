@@ -19,6 +19,7 @@ jobs:
       - uses: actions/checkout@v7
       - run: |
           COMMIT_TS=$(git show -s --format=%ct HEAD)
+          echo "$COMMIT_TS" > website/commit-timestamp.txt
           sed -i "s/__COMMIT_SHA__/$GITHUB_SHA/g; s/__COMMIT_SHORT__/${GITHUB_SHA::7}/g" website/index.html
           sed -i "s/__COMMIT_TIMESTAMP__/$COMMIT_TS/g; s/__COMMIT_SHORT__/${GITHUB_SHA::7}/g" website/terminal-deck/index.html
       - uses: google-github-actions/auth@v3
