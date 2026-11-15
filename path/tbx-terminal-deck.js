@@ -839,10 +839,18 @@ function fetchKittyWindows(sysKittyWindows = []) {
           const cmd = Array.isArray(p.cmdline) && p.cmdline[0] ? path.basename(p.cmdline[0]) : '';
           return cmd && !shellNames.has(cmd);
         });
+        const paneCwd = (fgProcs.find(p => p && p.cwd) || {}).cwd || pane.cwd || '';
+        const folderName = paneCwd ? (path.basename(paneCwd) || paneCwd) : '';
+        const titlePart = pane.title || activeTab.title || `kitty #${pane.id}`;
+        const sizePart = pane.columns && pane.lines ? `${pane.columns}×${pane.lines}` : '';
+        const nameParts = [];
+        if (folderName) nameParts.push(folderName);
+        if (titlePart && titlePart !== folderName) nameParts.push(titlePart);
+        if (sizePart) nameParts.push(sizePart);
 
         results.push({
           id: `kitty:${sockName}:${pane.id}`,
-          name: pane.title || activeTab.title || `kitty #${pane.id}`,
+          name: nameParts.join(' — ') || `kitty #${pane.id}`,
           index: osWin.is_focused && pane.is_focused ? 1 : osIdx + 2,
           position: {
             x: basePos.x + (pIdx * paneWidth),
