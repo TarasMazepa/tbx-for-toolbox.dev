@@ -1278,10 +1278,16 @@
     document.addEventListener('webkitfullscreenchange', updateFullscreenUI);
 
     // Per-terminal Auto-Accept state (persisted in localStorage)
+    function normalizeWindowId(windowId) {
+      if (typeof windowId === 'number') return windowId;
+      const str = String(windowId ?? '');
+      return /^\d+$/.test(str) ? parseInt(str, 10) : str;
+    }
+
     let savedAutoAcceptIds = [];
     try {
       const rawIds = JSON.parse(localStorage.getItem('tbx_auto_accept_ids') || '[]');
-      if (Array.isArray(rawIds)) savedAutoAcceptIds = rawIds.map(n => parseInt(n, 10)).filter(Boolean);
+      if (Array.isArray(rawIds)) savedAutoAcceptIds = rawIds.map(n => normalizeWindowId(n)).filter(Boolean);
     } catch (e) {}
     const autoAcceptIds = new Set(savedAutoAcceptIds);
     const activeAutoAccepts = new Map();
@@ -1301,7 +1307,7 @@
     }
 
     function toggleWindowAutoAccept(windowId) {
-      const id = parseInt(windowId, 10);
+      const id = normalizeWindowId(windowId);
       if (autoAcceptIds.has(id)) {
         autoAcceptIds.delete(id);
         clearAutoAcceptEntry(id);
@@ -1615,7 +1621,7 @@
     }
 
     function setKeyDispatchStage(windowId, stage) {
-      const id = parseInt(windowId, 10);
+      const id = normalizeWindowId(windowId);
       const prev = keyDispatchState.get(id);
       if (prev && prev.timer) clearTimeout(prev.timer);
 
@@ -1656,7 +1662,7 @@
     async function sendAction(windowId, key) {
       if (isActionInProgress) return false;
       isActionInProgress = true;
-      const id = parseInt(windowId, 10);
+      const id = normalizeWindowId(windowId);
       triggerHaptic(key === 'enter' ? 24 : 12);
       setKeyDispatchStage(id, 'sending');
       try {
@@ -1777,7 +1783,7 @@
 
       const existingBtns = new Map();
       enterDock.querySelectorAll('.dock-enter-btn').forEach(el => {
-        existingBtns.set(parseInt(el.getAttribute('data-id'), 10), el);
+        existingBtns.set(normalizeWindowId(el.getAttribute('data-id')), el);
       });
       const currentIds = new Set(sortedWindows.map(w => w.id));
       for (const [id, el] of existingBtns) {
@@ -1926,7 +1932,7 @@
       // Index existing DOM cards by window ID
       const existingCards = new Map();
       spatialStage.querySelectorAll('.spatial-window').forEach(el => {
-        const id = parseInt(el.getAttribute('data-id'), 10);
+        const id = normalizeWindowId(el.getAttribute('data-id'));
         existingCards.set(id, el);
       });
 
@@ -1987,11 +1993,11 @@
           card.innerHTML = `
             <div class="window-card">
               <div class="window-content">
-                <div class="card-header" onclick="sendAction(${w.id}, 'focus')">
+                <div class="card-header">
                   <span class="window-color-dot"></span>
                   <div class="window-title" title="${escapeHtml(w.name)}">${escapeHtml(w.name)}</div>
                   <div class="header-badges">
-                    <button type="button" class="card-auto-btn${autoAcceptIds.has(w.id) ? ' active' : ''}" title="Toggle Auto-Accept for this terminal" onclick="event.stopPropagation(); toggleWindowAutoAccept(${w.id})">⚡</button>
+                    <button type="button" class="card-auto-btn${autoAcceptIds.has(w.id) ? ' active' : ''}" title="Toggle Auto-Accept for this terminal">⚡</button>
                     <span class="state-badge" style="display: none"></span>
                     <span class="active-badge" style="display: ${isActive ? 'inline-block' : 'none'}">ACTIVE</span>
                   </div>
@@ -2002,6 +2008,15 @@
               <button type="button" class="inline-enter-btn">↵ Enter</button>
             </div>
           `;
+          const newCardHeader = card.querySelector('.card-header');
+          if (newCardHeader) newCardHeader.addEventListener('click', () => sendAction(w.id, 'focus'));
+          const newAutoBtn = card.querySelector('.card-auto-btn');
+          if (newAutoBtn) {
+            newAutoBtn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              toggleWindowAutoAccept(w.id);
+            });
+          }
           const newInlineBtn = card.querySelector('.inline-enter-btn');
           if (newInlineBtn) attachEnterHandlers(newInlineBtn, w.id);
           spatialStage.appendChild(card);

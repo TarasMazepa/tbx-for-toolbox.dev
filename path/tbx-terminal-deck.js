@@ -417,6 +417,21 @@ const KEY_CODES = {
   n: 45
 };
 
+const KITTY_KEYS = {
+  enter: 'enter',
+  return: 'enter',
+  up: 'up',
+  down: 'down',
+  left: 'left',
+  right: 'right',
+  esc: 'escape',
+  escape: 'escape',
+  space: 'space',
+  tab: 'tab',
+  y: 'y',
+  n: 'n'
+};
+
 // Connected SSE clients
 const sseClients = new Set();
 let lastStateJson = '';
@@ -525,8 +540,38 @@ const JXA_FETCH_SCRIPT = `
     }
   } catch(e) {}
 
+  // 1b. Query System Events for Kitty OS window geometry (independent of Terminal.app)
+  const kittySysVisible = [];
+  try {
+    const sys = Application("System Events");
+    const kittyProcs = sys.processes.whose({ bundleIdentifier: "net.kovidgoyal.kitty" });
+    for (let p = 0; p < kittyProcs.length; p++) {
+      const kp = kittyProcs[p];
+      let kNames = [], kPos = [], kSizes = [], kMin = [];
+      try {
+        kNames = kp.windows.name();
+        kPos = kp.windows.position();
+        kSizes = kp.windows.size();
+        try { kMin = kp.windows.attributes.byName("AXMinimized").value(); } catch(e) {}
+      } catch(e) {}
+      if (kNames && kNames.length) {
+        for (let k = 0; k < kNames.length; k++) {
+          if (kMin && kMin[k] === true) continue;
+          const pos = kPos[k];
+          const sz = kSizes[k];
+          kittySysVisible.push({
+            name: kNames[k] || "",
+            position: pos && Array.isArray(pos) ? { x: Math.round(pos[0]), y: Math.round(pos[1]) } : { x: 0, y: 0 },
+            size: sz && Array.isArray(sz) ? { width: Math.round(sz[0]), height: Math.round(sz[1]) } : { width: 800, height: 600 },
+            used: false
+          });
+        }
+      }
+    }
+  } catch(e) {}
+
   const terminal = Application("Terminal");
-  if (!terminal.running()) return JSON.stringify({ windows: [], displays: displays });
+  if (!terminal.running()) return JSON.stringify({ windows: [], displays: displays, kittyWindows: kittySysVisible });
   
   const wins = terminal.windows;
   let ids = [], names = [], positions = [], sizes = [], indices = [], miniaturized = [];
@@ -538,10 +583,10 @@ const JXA_FETCH_SCRIPT = `
     indices = wins.index();
     try { miniaturized = wins.miniaturized(); } catch(e) {}
   } catch(e) {
-    return JSON.stringify({ windows: [], displays: displays });
+    return JSON.stringify({ windows: [], displays: displays, kittyWindows: kittySysVisible });
   }
   
-  if (!ids || !ids.length) return JSON.stringify({ windows: [], displays: displays });
+  if (!ids || !ids.length) return JSON.stringify({ windows: [], displays: displays, kittyWindows: kittySysVisible });
 
   // 2. Query System Events for true global desktop coordinates across multi-monitor setups.
   // Note: Terminal.app's internal AppleScript dictionary has an upstream bug where positions[i].y
@@ -668,7 +713,7 @@ const JXA_FETCH_SCRIPT = `
       analysis: analysis
     });
   }
-  return JSON.stringify({ windows: results, displays: displays });
+  return JSON.stringify({ windows: results, displays: displays, kittyWindows: kittySysVisible });
 })()
 `.trim();
 
@@ -686,8 +731,143 @@ function formatPreviewText(text) {
     .join('\n');
 }
 
+const kittySocketByName = new Map();
+
 /**
- * Query current Terminal.app window and multi-monitor display state
+ * Discover active Kitty remote-control Unix sockets in /tmp (e.g. /tmp/kitty-sock-<pid>).
+ */
+function getKittySockets() {
+  const sockets = [];
+  const seen = new Set();
+
+  const envSock = process.env.KITTY_LISTEN_ON;
+  if (envSock && envSock.startsWith('unix:')) {
+    const sockPath = envSock.slice(5);
+    if (fs.existsSync(sockPath)) {
+      seen.add(sockPath);
+      sockets.push(envSock);
+      kittySocketByName.set(path.basename(sockPath), envSock);
+    }
+  }
+
+  try {
+    for (const entry of fs.readdirSync('/tmp')) {
+      if (!entry.startsWith('kitty-sock')) continue;
+      const fullPath = path.join('/tmp', entry);
+      if (seen.has(fullPath)) continue;
+      try {
+        if (fs.statSync(fullPath).isSocket()) {
+          seen.add(fullPath);
+          const sock = `unix:${fullPath}`;
+          sockets.push(sock);
+          kittySocketByName.set(entry, sock);
+        }
+      } catch (_) {}
+    }
+  } catch (_) {}
+
+  return sockets;
+}
+
+/**
+ * Query Kitty windows, active tab panes, and screen text via `kitten @`,
+ * matching each OS window to its macOS System Events geometry.
+ */
+function fetchKittyWindows(sysKittyWindows = []) {
+  const sockets = getKittySockets();
+  if (!sockets.length) return [];
+
+  const results = [];
+  const shellNames = new Set(['zsh', 'bash', 'fish', 'sh', '-zsh', '-bash', '-fish', 'login']);
+
+  for (const sock of sockets) {
+    const sockName = path.basename(sock.replace(/^unix:/, ''));
+    let osWindows = [];
+    try {
+      const raw = execFileSync('kitten', ['@', '--to', sock, 'ls'], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+        timeout: 1000
+      });
+      osWindows = JSON.parse(raw.trim());
+    } catch (_) {
+      continue;
+    }
+
+    if (!Array.isArray(osWindows)) continue;
+
+    for (let osIdx = 0; osIdx < osWindows.length; osIdx++) {
+      const osWin = osWindows[osIdx];
+      const tabs = Array.isArray(osWin.tabs) ? osWin.tabs : [];
+      if (!tabs.length) continue;
+
+      const activeTab = tabs.find(t => t.is_focused || t.is_active) || tabs[0];
+      const panes = Array.isArray(activeTab.windows) ? activeTab.windows : [];
+      if (!panes.length) continue;
+
+      // Match OS window geometry from System Events by title, falling back to next unused window
+      const matchTitle = activeTab.title || (panes[0] && panes[0].title) || '';
+      let sysMatch = sysKittyWindows.find(s => !s.used && s.name && matchTitle && (s.name === matchTitle || s.name.includes(matchTitle) || matchTitle.includes(s.name)));
+      if (!sysMatch) {
+        sysMatch = sysKittyWindows.find(s => !s.used);
+      }
+      if (sysMatch) sysMatch.used = true;
+
+      const basePos = sysMatch ? sysMatch.position : { x: 0, y: 0 };
+      const baseSize = sysMatch ? sysMatch.size : { width: 800, height: 600 };
+      const paneWidth = Math.max(100, Math.round(baseSize.width / panes.length));
+
+      for (let pIdx = 0; pIdx < panes.length; pIdx++) {
+        const pane = panes[pIdx];
+        let preview = '';
+        let analysis = '';
+        try {
+          const text = execFileSync('kitten', ['@', '--to', sock, 'get-text', '--match', `id:${pane.id}`, '--extent', 'screen'], {
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'ignore'],
+            timeout: 800
+          });
+          if (text) {
+            const nonEmpty = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+            analysis = nonEmpty.slice(-14).join('\n');
+            preview = nonEmpty.slice(-60).join('\n');
+          }
+        } catch (_) {}
+
+        const fgProcs = Array.isArray(pane.foreground_processes) ? pane.foreground_processes : [];
+        const busy = fgProcs.some(p => {
+          const cmd = Array.isArray(p.cmdline) && p.cmdline[0] ? path.basename(p.cmdline[0]) : '';
+          return cmd && !shellNames.has(cmd);
+        });
+
+        results.push({
+          id: `kitty:${sockName}:${pane.id}`,
+          name: pane.title || activeTab.title || `kitty #${pane.id}`,
+          index: osWin.is_focused && pane.is_focused ? 1 : osIdx + 2,
+          position: {
+            x: basePos.x + (pIdx * paneWidth),
+            y: basePos.y
+          },
+          size: {
+            width: panes.length === 1 ? baseSize.width : paneWidth,
+            height: baseSize.height
+          },
+          cols: pane.columns || null,
+          rows: pane.lines || null,
+          tty: null,
+          busy,
+          preview,
+          analysis
+        });
+      }
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Query current Terminal.app & Kitty windows and multi-monitor display state
  */
 function fetchTerminalState() {
   try {
@@ -697,8 +877,11 @@ function fetchTerminalState() {
       timeout: 2500
     });
     const parsed = JSON.parse(raw.trim());
-    const rawWindows = Array.isArray(parsed) ? parsed : (parsed && parsed.windows ? parsed.windows : []);
+    const rawTerminalWindows = Array.isArray(parsed) ? parsed : (parsed && parsed.windows ? parsed.windows : []);
     const displays = Array.isArray(parsed) ? [] : (parsed && parsed.displays ? parsed.displays : []);
+    const sysKittyWindows = Array.isArray(parsed) ? [] : (parsed && parsed.kittyWindows ? parsed.kittyWindows : []);
+    const rawKittyWindows = fetchKittyWindows(sysKittyWindows);
+    const rawWindows = [...rawTerminalWindows, ...rawKittyWindows];
 
     if (Array.isArray(rawWindows)) {
       const enriched = rawWindows.map(w => {
@@ -728,9 +911,68 @@ function fetchTerminalState() {
 }
 
 /**
+ * Focus or send a key directly to a Kitty window via `kitten @` without stealing OS focus.
+ */
+function injectKittyKey(windowId, key) {
+  const normalizedKey = key ? key.toLowerCase().trim() : 'focus';
+  const parts = String(windowId).split(':');
+  // Expected format: kitty:<sockName>:<paneId>
+  if (parts.length !== 3 || parts[0] !== 'kitty') {
+    throw new Error(`Invalid Kitty windowId: "${windowId}"`);
+  }
+  const sock = kittySocketByName.get(parts[1]) || `unix:/tmp/${parts[1]}`;
+  const paneId = parts[2];
+
+  if (normalizedKey === 'focus') {
+    execFileSync('kitten', ['@', '--to', sock, 'focus-window', '--match', `id:${paneId}`], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: 1500
+    });
+    execFileSync('osascript', ['-e', 'tell application "kitty" to activate'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: 1500
+    });
+    return {
+      success: true,
+      focusLost: false,
+      focusConfirmed: true,
+      windowId,
+      key: 'focus',
+      restoredFocus: false
+    };
+  }
+
+  const kittyKey = KITTY_KEYS[normalizedKey];
+  if (!kittyKey) {
+    throw new Error(`Unsupported key: "${key}". Supported: ${Object.keys(KITTY_KEYS).join(', ')}, focus`);
+  }
+
+  execFileSync('kitten', ['@', '--to', sock, 'send-key', '--match', `id:${paneId}`, kittyKey], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+    timeout: 1500
+  });
+
+  return {
+    success: true,
+    focusLost: false,
+    focusConfirmed: true,
+    windowId,
+    key: normalizedKey,
+    restoredFocus: false
+  };
+}
+
+/**
  * Focus window, inject keystroke with settlement delay, and automatically restore previous focus
  */
 function injectKey(windowId, key) {
+  if (typeof windowId === 'string' && windowId.startsWith('kitty:')) {
+    return injectKittyKey(windowId, key);
+  }
+
   const normalizedKey = key ? key.toLowerCase().trim() : 'focus';
   const code = normalizedKey === 'focus' ? null : KEY_CODES[normalizedKey];
 
@@ -1036,7 +1278,9 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      targetWindowId = parseInt(windowId, 10);
+      targetWindowId = typeof windowId === 'number'
+        ? windowId
+        : (/^\d+$/.test(String(windowId)) ? parseInt(windowId, 10) : String(windowId));
       targetKey = key || 'focus';
       if (sseClients.size > 0) {
         broadcast(JSON.stringify({ type: 'key_status', windowId: targetWindowId, key: targetKey, stage: 'started' }));
