@@ -6,6 +6,7 @@ const http = require('node:http');
 const {
   detectAgyState,
   generateQrSvg,
+  getHostedPhoneUrl,
   isHostedUrlReachable,
   getDesktopOpenUrl,
 } = require('../../path/tbx-terminal-deck.js');
@@ -60,6 +61,17 @@ test('isHostedUrlReachable checks HTTP status and handles unreachable URLs', asy
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
+});
+
+test('getHostedPhoneUrl returns hosted URL with LAN host param for mobile QR', () => {
+  assert.equal(
+    getHostedPhoneUrl('192.168.1.50', 8999),
+    'https://tbx-for-toolbox.dev/terminal-deck/?host=http%3A%2F%2F192.168.1.50%3A8999'
+  );
+  assert.equal(
+    getHostedPhoneUrl('10.0.0.12', 9001),
+    'https://tbx-for-toolbox.dev/terminal-deck/?host=http%3A%2F%2F10.0.0.12%3A9001'
+  );
 });
 
 test('generateQrSvg renders a valid SVG QR code for hosted URL', () => {

@@ -343,8 +343,8 @@ const API_VERSION = 1;
 /**
  * Build the hosted Terminal Deck URL with the ?host= parameter pointing to this daemon's LAN address.
  */
-function getHostedPhoneUrl(localIp = getLocalIp()) {
-  const hostUrl = `http://${localIp}:${PORT}`;
+function getHostedPhoneUrl(localIp = getLocalIp(), port = PORT) {
+  const hostUrl = `http://${localIp}:${port}`;
   return `${HOSTED_URL}?host=${encodeURIComponent(hostUrl)}`;
 }
 
@@ -1074,6 +1074,7 @@ module.exports = {
   API_VERSION,
   detectAgyState,
   generateQrSvg,
+  getHostedPhoneUrl,
   isHostedUrlReachable,
   getDesktopOpenUrl,
 };
