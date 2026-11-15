@@ -8,7 +8,7 @@ const {
   generateQrSvg,
   isHostedUrlReachable,
   getDesktopOpenUrl,
-} = require('../../tbx-terminal-deck.js');
+} = require('../../path/tbx-terminal-deck.js');
 const { SAMPLES } = require('./test-data.js');
 
 for (const sample of SAMPLES) {
