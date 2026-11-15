@@ -2154,7 +2154,7 @@
           <p>${body}</p>
           ${mobile ? '' : `
             <div class="onboarding-cmd">
-              <code>./path/tbx-terminal-deck.js</code>
+              <code>tbx-terminal-deck.js</code>
               <button type="button" class="header-btn" id="copyCmdBtn">Copy</button>
             </div>
             <div class="onboarding-actions">
@@ -2174,7 +2174,7 @@
       if (copyBtn) {
         copyBtn.addEventListener('click', async () => {
           try {
-            await navigator.clipboard.writeText('./path/tbx-terminal-deck.js');
+            await navigator.clipboard.writeText('tbx-terminal-deck.js');
             copyBtn.textContent = 'Copied!';
             setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
           } catch (e) {}
