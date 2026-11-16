@@ -1,1 +1,0 @@
-path/tbx-subl-edit-antigravity-cli-settings.sh

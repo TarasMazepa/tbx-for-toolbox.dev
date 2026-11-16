@@ -1,1 +1,0 @@
-path/tbx-daily-changes.sh

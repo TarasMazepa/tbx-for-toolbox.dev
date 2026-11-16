@@ -6,18 +6,9 @@ Exploratory scratchpad for backlog ideas, investigative spikes, architectural in
 
 ## Active ToLooks
 
-- [ ] **6. Migrate Root Scripts into `path/` and `scripts/` Directories**
-  - **Idea**: Move scripts out of the repository root so primary CLI scripts (meant to be on `PATH`) live in `path/` and secondary/helper scripts (not invoked directly) live in `scripts/`.
-  - **Context**: All user-facing `tbx-*.sh` and `tbx-*.js` scripts have been moved into `path/` with relative compatibility symlinks left in the repository root so existing `$PATH` setups continue to work during migration.
-  - **Investigation**:
-    - [x] Move `tbx-*` scripts into `path/` and leave compatibility symlinks in root.
-    - [x] Update relative `require`/path references (e.g. [`path/tbx-terminal-deck.js`](path/tbx-terminal-deck.js), [`tests/terminal-deck/test.js`](tests/terminal-deck/test.js), and symlink-safe `SCRIPT_DIR`/`REPO_ROOT` in `path/*.sh`).
-    - [x] Update documentation and workflow references in [`AGENTS.md`](AGENTS.md), [`MORE-AGENTS.md`](MORE-AGENTS.md), [`README.md`](README.md), [`website/terminal-deck/index.html`](website/terminal-deck/index.html), and `.github/workflows/`.
-    - [ ] Remove root compatibility symlinks once `$PATH` points to `path/`.
-
 - [ ] **5. Publish `tbx` Scripts to Homebrew with `tbx <command>` Dispatcher**
   - **Idea**: Distribute `tbx` scripts via Homebrew (e.g. `brew install TarasMazepa/tbx/tbx` or `homebrew-tap`) and provide a `tbx` entrypoint so users can run `tbx <command>` (mapping to `tbx-<command>.sh` or `tbx-<command>.js`, e.g. `tbx terminal-deck`, `tbx gh-status`).
-  - **Context**: Currently scripts live in `path/` as `tbx-*.sh` and `tbx-*.js` (with temporary root compatibility symlinks) and require cloning the repo and adding `path/` to `PATH`. A `tbx` dispatcher + Homebrew formula makes them installable globally in one command, supports dynamic shell completions (`zsh`/`bash`), and gives a clean `npx`-free command (e.g. `tbx terminal-deck`) to reference in the Terminal Deck onboarding UI.
+  - **Context**: Currently scripts live in `path/` as `tbx-*.sh` and `tbx-*.js` and require cloning the repo and adding `path/` to `PATH`. A `tbx` dispatcher + Homebrew formula makes them installable globally in one command, supports dynamic shell completions (`zsh`/`bash`), and gives a clean `npx`-free command (e.g. `tbx terminal-deck`) to reference in the Terminal Deck onboarding UI.
   - **Investigation**:
     - [ ] Design a lightweight `path/tbx` dispatcher script that lists available `tbx-*` commands, forwards arguments to `tbx-<command>.sh` / `tbx-<command>.js`, and handles `tbx --help` / `tbx <command> --help`.
     - [ ] Add `tbx --commands` (dynamic subcommand listing) and `tbx completion zsh|bash` (supporting local `eval "$(tbx completion zsh)"` and Homebrew's `generate_completions_from_executable(bin/"tbx", "completion")`).
@@ -27,6 +18,14 @@ Exploratory scratchpad for backlog ideas, investigative spikes, architectural in
 ---
 
 ## Resolved Architectural Decisions
+
+- [x] **6. Migrate Root Scripts into `path/` and `scripts/` Directories**
+  - **Status**: Completed across [`path/`](path/), [`scripts/`](scripts/), documentation, and tests.
+  - **Resolution**:
+    1. Moved all user-facing `tbx-*.sh` and `tbx-*.js` scripts into `path/` and helper scripts into `scripts/`.
+    2. Updated relative `require`/path references (e.g. [`path/tbx-terminal-deck.js`](path/tbx-terminal-deck.js), [`tests/terminal-deck/test.js`](tests/terminal-deck/test.js), and `SCRIPT_DIR`/`REPO_ROOT` in `path/*.sh`).
+    3. Updated documentation and workflow references in [`AGENTS.md`](AGENTS.md), [`MORE-AGENTS.md`](MORE-AGENTS.md), [`README.md`](README.md), [`daily-changes/AGENTS.md`](daily-changes/AGENTS.md), [`website/terminal-deck/index.html`](website/terminal-deck/index.html), and `.github/workflows/`.
+    4. Removed all temporary root compatibility symlinks once `$PATH` pointed to `path/`.
 
 - [x] **4. Host Terminal Deck Webpage on `toolbox.dev` Website**
   - **Status**: Implemented in [`website/terminal-deck/index.html`](website/terminal-deck/index.html) and [`path/tbx-terminal-deck.js`](path/tbx-terminal-deck.js).

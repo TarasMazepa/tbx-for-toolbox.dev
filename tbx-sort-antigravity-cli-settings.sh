@@ -1,1 +1,0 @@
-path/tbx-sort-antigravity-cli-settings.sh

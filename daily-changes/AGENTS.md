@@ -7,9 +7,9 @@ Instructions for AI agents when asked to produce a daily summary, daily changes 
 When the user asks for a daily summary (e.g. *"give me a daily summary"*, *"summarize today's changes"*, *"prepare discord update"*):
 
 ### 1. Run the Changes Collector Script
-Run `tbx-daily-changes.sh` from the repository root (or `../tbx-daily-changes.sh` if currently inside `daily-changes/`):
+Run `path/tbx-daily-changes.sh` from the repository root (or `../path/tbx-daily-changes.sh` if currently inside `daily-changes/`):
 ```bash
-./tbx-daily-changes.sh [--no-fetch] [-o <output-dir>] [today|yesterday|YYYY-MM-DD] [output-dir]
+./path/tbx-daily-changes.sh [--no-fetch] [-o <output-dir>] [today|yesterday|YYYY-MM-DD] [output-dir]
 ```
 - **Smart branch resolution**: Automatically fetches and targets the canonical default branch (`origin/main`, `main`, `master`) across all repositories, ignoring local unmerged feature branches.
 - **Auto-fetch**: Fetches latest refs from `origin` by default before inspecting diffs (pass `--no-fetch` to skip).
