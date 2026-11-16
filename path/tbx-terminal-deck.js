@@ -556,39 +556,30 @@ const JXA_FETCH_SCRIPT = `
     }
   } catch(e) {}
 
-  // 1b. Query System Events for Kitty OS window geometry (independent of Terminal.app)
-  const kittySysVisible = [];
+  // 1b. Query CoreGraphics window list for Kitty OS window geometry keyed by CGWindowID (fast & exact)
+  const kittyCGWindows = [];
   try {
-    const sys = Application("System Events");
-    const kittyProcs = sys.processes.whose({ bundleIdentifier: "net.kovidgoyal.kitty" });
-    for (let p = 0; p < kittyProcs.length; p++) {
-      const kp = kittyProcs[p];
-      let kNames = [], kPos = [], kSizes = [], kMin = [];
-      try {
-        kNames = kp.windows.name();
-        kPos = kp.windows.position();
-        kSizes = kp.windows.size();
-        try { kMin = kp.windows.attributes.byName("AXMinimized").value(); } catch(e) {}
-      } catch(e) {}
-      if (kNames && kNames.length) {
-        for (let k = 0; k < kNames.length; k++) {
-          const isMinimized = Boolean(kMin && kMin[k] === true);
-          const pos = kPos[k];
-          const sz = kSizes[k];
-          kittySysVisible.push({
-            name: kNames[k] || "",
-            position: pos && Array.isArray(pos) ? { x: Math.round(pos[0]), y: Math.round(pos[1]) } : { x: 0, y: 0 },
-            size: sz && Array.isArray(sz) ? { width: Math.round(sz[0]), height: Math.round(sz[1]) } : { width: 800, height: 600 },
-            minimized: isMinimized,
-            used: false
-          });
-        }
+    ObjC.import("CoreGraphics");
+    const ref = $.CGWindowListCopyWindowInfo($.kCGWindowListOptionAll, $.kCGNullWindowID);
+    const cgList = ObjC.deepUnwrap(ObjC.castRefToObject(ref));
+    if (Array.isArray(cgList)) {
+      for (let i = 0; i < cgList.length; i++) {
+        const w = cgList[i];
+        if (w.kCGWindowOwnerName !== "kitty" || w.kCGWindowLayer !== 0) continue;
+        const b = w.kCGWindowBounds;
+        if (!b || !(b.Width > 0) || !(b.Height > 0)) continue;
+        kittyCGWindows.push({
+          id: w.kCGWindowNumber,
+          position: { x: Math.round(b.X), y: Math.round(b.Y) },
+          size: { width: Math.round(b.Width), height: Math.round(b.Height) },
+          onScreen: Boolean(w.kCGWindowIsOnscreen)
+        });
       }
     }
   } catch(e) {}
 
   const terminal = Application("Terminal");
-  if (!terminal.running()) return JSON.stringify({ windows: [], displays: displays, kittyWindows: kittySysVisible });
+  if (!terminal.running()) return JSON.stringify({ windows: [], displays: displays, kittyWindows: kittyCGWindows });
   
   const wins = terminal.windows;
   let ids = [], names = [], positions = [], sizes = [], indices = [], miniaturized = [];
@@ -600,10 +591,10 @@ const JXA_FETCH_SCRIPT = `
     indices = wins.index();
     try { miniaturized = wins.miniaturized(); } catch(e) {}
   } catch(e) {
-    return JSON.stringify({ windows: [], displays: displays, kittyWindows: kittySysVisible });
+    return JSON.stringify({ windows: [], displays: displays, kittyWindows: kittyCGWindows });
   }
   
-  if (!ids || !ids.length) return JSON.stringify({ windows: [], displays: displays, kittyWindows: kittySysVisible });
+  if (!ids || !ids.length) return JSON.stringify({ windows: [], displays: displays, kittyWindows: kittyCGWindows });
 
   // 2. Query System Events for true global desktop coordinates across multi-monitor setups.
   // Note: Terminal.app's internal AppleScript dictionary has an upstream bug where positions[i].y
@@ -730,7 +721,7 @@ const JXA_FETCH_SCRIPT = `
       analysis: analysis
     });
   }
-  return JSON.stringify({ windows: results, displays: displays, kittyWindows: kittySysVisible });
+  return JSON.stringify({ windows: results, displays: displays, kittyWindows: kittyCGWindows });
 })()
 `.trim();
 
@@ -788,11 +779,16 @@ function getKittySockets() {
 
 /**
  * Query Kitty windows, active tab panes, and screen text via `kitten @`,
- * matching each OS window to its macOS System Events geometry.
+ * matching each OS window to its macOS CoreGraphics window geometry by platform_window_id.
  */
-function fetchKittyWindows(sysKittyWindows = []) {
+function fetchKittyWindows(kittyCGWindows = []) {
   const sockets = getKittySockets();
   if (!sockets.length) return [];
+
+  const cgById = new Map();
+  for (const w of kittyCGWindows) {
+    if (typeof w.id === 'number') cgById.set(w.id, w);
+  }
 
   const results = [];
   const shellNames = new Set(['zsh', 'bash', 'fish', 'sh', '-zsh', '-bash', '-fish', 'login']);
@@ -813,57 +809,20 @@ function fetchKittyWindows(sysKittyWindows = []) {
 
     if (!Array.isArray(osWindows)) continue;
 
-    // Pre-match OS windows to System Events geometry in passes so exact title matches
-    // are never stolen by substring matches (e.g. "agy" matching "agy --conversation=...").
-    const osEntries = osWindows.map((osWin, osIdx) => {
+    for (let osIdx = 0; osIdx < osWindows.length; osIdx++) {
+      const osWin = osWindows[osIdx];
       const tabs = Array.isArray(osWin.tabs) ? osWin.tabs : [];
       const activeTab = tabs.find(t => t.is_focused || t.is_active) || tabs[0] || null;
       const panes = activeTab && Array.isArray(activeTab.windows) ? activeTab.windows : [];
-      const matchTitle = (activeTab && activeTab.title) || (panes[0] && panes[0].title) || '';
-      return { osWin, osIdx, activeTab, panes, matchTitle, sysMatch: null };
-    }).filter(e => e.panes.length > 0);
+      if (!panes.length) continue;
 
-    const matchOrder = [
-      ...osEntries.filter(e => e.osWin.is_focused || e.osWin.last_focused),
-      ...osEntries.filter(e => !(e.osWin.is_focused || e.osWin.last_focused))
-    ];
-
-    // Pass 1: exact title match
-    for (const entry of matchOrder) {
-      if (!entry.matchTitle) continue;
-      const hit = sysKittyWindows.find(s => !s.used && s.name && s.name === entry.matchTitle);
-      if (hit) {
-        hit.used = true;
-        entry.sysMatch = hit;
-      }
-    }
-    // Pass 2: substring title match
-    for (const entry of matchOrder) {
-      if (entry.sysMatch || !entry.matchTitle) continue;
-      const hit = sysKittyWindows.find(s => !s.used && s.name && (s.name.includes(entry.matchTitle) || entry.matchTitle.includes(s.name)));
-      if (hit) {
-        hit.used = true;
-        entry.sysMatch = hit;
-      }
-    }
-    // Pass 3: fallback to next unused window
-    for (const entry of matchOrder) {
-      if (entry.sysMatch) continue;
-      const hit = sysKittyWindows.find(s => !s.used && !s.minimized) || sysKittyWindows.find(s => !s.used);
-      if (hit) {
-        hit.used = true;
-        entry.sysMatch = hit;
-      }
-    }
-
-    for (const entry of osEntries) {
-      const { osWin, osIdx, activeTab, panes, sysMatch } = entry;
-      if ((sysMatch && sysMatch.minimized) || (sysKittyWindows.length > 0 && !sysMatch)) {
+      const cgWin = typeof osWin.platform_window_id === 'number' ? cgById.get(osWin.platform_window_id) : null;
+      if (cgById.size > 0 && (!cgWin || !cgWin.onScreen)) {
         continue;
       }
 
-      const basePos = sysMatch ? sysMatch.position : { x: 0, y: 0 };
-      const baseSize = sysMatch ? sysMatch.size : { width: 800, height: 600 };
+      const basePos = cgWin ? cgWin.position : { x: 0, y: 0 };
+      const baseSize = cgWin ? cgWin.size : { width: 800, height: 600 };
       const paneWidth = Math.max(100, Math.round(baseSize.width / panes.length));
 
       for (let pIdx = 0; pIdx < panes.length; pIdx++) {

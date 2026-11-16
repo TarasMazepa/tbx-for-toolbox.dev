@@ -2184,12 +2184,53 @@
       return { compatible: true, state: 'ok', message: `API v${backendVersion}` };
     }
 
+    const DEPLOY_PROMPT_KEY = 'terminal_deck_deploy_prompt_at';
+    const REFRESH_PERFORMED_KEY = 'terminal_deck_refresh_performed';
+    const DEPLOY_PROMPT_INTERVAL_MS = 24 * 60 * 60 * 1000;
+    let latestPromptedCommitTs = null;
+    let latestPromptedApiVersion = null;
+
+    function recordRefreshPerformed() {
+      const now = String(Date.now());
+      try {
+        localStorage.setItem(DEPLOY_PROMPT_KEY, now);
+        localStorage.setItem(REFRESH_PERFORMED_KEY, JSON.stringify({
+          at: Date.now(),
+          commitTs: latestPromptedCommitTs,
+          apiVersion: latestPromptedApiVersion
+        }));
+      } catch (e) {}
+    }
+
+    function wasRefreshRecentlyPerformed(commitTs = null, apiVersion = null) {
+      try {
+        const raw = localStorage.getItem(REFRESH_PERFORMED_KEY);
+        if (!raw) return false;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed.at !== 'number') return false;
+        if ((Date.now() - parsed.at) >= DEPLOY_PROMPT_INTERVAL_MS) return false;
+        if (typeof commitTs === 'number' && typeof parsed.commitTs === 'number' && commitTs > parsed.commitTs) {
+          return false;
+        }
+        if (typeof apiVersion === 'number' && typeof parsed.apiVersion === 'number' && apiVersion > parsed.apiVersion) {
+          return false;
+        }
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
     function updateVersionBanner(backendVersion, backendCommitTs = null, backendCommitShort = null) {
       if (!versionBanner || !versionBannerText) return;
       const status = getVersionStatus(backendVersion, backendCommitTs, backendCommitShort);
-      if (status.compatible || versionDismissed) {
+      const suppressedByRefresh = status.state === 'frontend-outdated' &&
+        wasRefreshRecentlyPerformed(backendCommitTs, backendVersion);
+      if (status.compatible || versionDismissed || suppressedByRefresh) {
         versionBanner.hidden = true;
       } else {
+        if (typeof backendCommitTs === 'number') latestPromptedCommitTs = backendCommitTs;
+        if (typeof backendVersion === 'number') latestPromptedApiVersion = backendVersion;
         versionBannerText.textContent = `⚠️ ${status.message}`;
         if (versionRefreshBtn) {
           versionRefreshBtn.hidden = status.state !== 'frontend-outdated';
@@ -2200,7 +2241,10 @@
     }
 
     if (versionRefreshBtn) {
-      versionRefreshBtn.addEventListener('click', () => window.location.reload());
+      versionRefreshBtn.addEventListener('click', () => {
+        recordRefreshPerformed();
+        window.location.reload();
+      });
     }
     if (versionDismissBtn) {
       versionDismissBtn.addEventListener('click', () => {
@@ -2209,9 +2253,6 @@
         handleResize();
       });
     }
-
-    const DEPLOY_PROMPT_KEY = 'terminal_deck_deploy_prompt_at';
-    const DEPLOY_PROMPT_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
     async function checkDeployedUpdate() {
       if (FRONTEND_COMMIT_TS === null) return;
@@ -2225,7 +2266,9 @@
         const text = (await res.text()).trim();
         if (!/^\d+$/.test(text)) return;
         const deployedTs = parseInt(text, 10);
+        if (wasRefreshRecentlyPerformed(deployedTs, null)) return;
         if (deployedTs > FRONTEND_COMMIT_TS && versionBanner && versionBannerText) {
+          latestPromptedCommitTs = deployedTs;
           localStorage.setItem(DEPLOY_PROMPT_KEY, String(Date.now()));
           versionDismissed = false;
           versionBannerText.textContent = '⚠️ A newer version of Terminal Spatial Remote is deployed — refresh this page.';
