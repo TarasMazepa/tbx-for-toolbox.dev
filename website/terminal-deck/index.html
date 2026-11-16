@@ -2184,10 +2184,34 @@
       return { compatible: true, state: 'ok', message: `API v${backendVersion}` };
     }
 
+    const DEPLOY_PROMPT_KEY = 'terminal_deck_deploy_prompt_at';
+    const REFRESH_PERFORMED_KEY = 'terminal_deck_refresh_performed';
+    const DEPLOY_PROMPT_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+    function recordRefreshPerformed() {
+      const now = Date.now();
+      try {
+        localStorage.setItem(DEPLOY_PROMPT_KEY, String(now));
+        localStorage.setItem(REFRESH_PERFORMED_KEY, JSON.stringify({ at: now }));
+      } catch (e) {}
+    }
+
+    function wasRefreshRecentlyPerformed() {
+      try {
+        const raw = localStorage.getItem(REFRESH_PERFORMED_KEY);
+        if (!raw) return false;
+        const parsed = JSON.parse(raw);
+        return Boolean(parsed && typeof parsed.at === 'number' && (Date.now() - parsed.at) < DEPLOY_PROMPT_INTERVAL_MS);
+      } catch (e) {
+        return false;
+      }
+    }
+
     function updateVersionBanner(backendVersion, backendCommitTs = null, backendCommitShort = null) {
       if (!versionBanner || !versionBannerText) return;
       const status = getVersionStatus(backendVersion, backendCommitTs, backendCommitShort);
-      if (status.compatible || versionDismissed) {
+      const suppressedByRefresh = status.state === 'frontend-outdated' && wasRefreshRecentlyPerformed();
+      if (status.compatible || versionDismissed || suppressedByRefresh) {
         versionBanner.hidden = true;
       } else {
         versionBannerText.textContent = `⚠️ ${status.message}`;
@@ -2200,7 +2224,10 @@
     }
 
     if (versionRefreshBtn) {
-      versionRefreshBtn.addEventListener('click', () => window.location.reload());
+      versionRefreshBtn.addEventListener('click', () => {
+        recordRefreshPerformed();
+        window.location.reload();
+      });
     }
     if (versionDismissBtn) {
       versionDismissBtn.addEventListener('click', () => {
@@ -2210,15 +2237,13 @@
       });
     }
 
-    const DEPLOY_PROMPT_KEY = 'terminal_deck_deploy_prompt_at';
-    const DEPLOY_PROMPT_INTERVAL_MS = 24 * 60 * 60 * 1000;
-
     async function checkDeployedUpdate() {
       if (FRONTEND_COMMIT_TS === null) return;
       if (window.location.hostname !== 'tbx-for-toolbox.dev') return;
       try {
         const lastPrompt = parseInt(localStorage.getItem(DEPLOY_PROMPT_KEY) || '0', 10);
         if (lastPrompt && (Date.now() - lastPrompt) < DEPLOY_PROMPT_INTERVAL_MS) return;
+        if (wasRefreshRecentlyPerformed()) return;
 
         const res = await fetch(`/commit-timestamp.txt?t=${Date.now()}`, { cache: 'no-store' });
         if (!res.ok) return;
