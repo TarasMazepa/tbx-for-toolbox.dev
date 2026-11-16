@@ -17,6 +17,15 @@ Exploratory scratchpad for backlog ideas, investigative spikes, architectural in
 
 ---
 
+- [ ] **7. Migrate Non-Kebab-Case Markdown Files to `kebab-case`**
+  - **Idea**: Rename remaining uppercase/underscore markdown files to pure `kebab-case` per `agents.md` and update any internal or workflow references to them.
+  - **Context**: `repository-seed` standardized markdown naming to pure `kebab-case` (`agents.md`, `readme.md`, `tolooks.md`, `more-agents.md`).
+  - **Investigation**:
+    - [ ] Rename `MORE-AGENTS.md` → `more-agents.md` and update references
+    - [ ] Rename `README.md` → `readme.md` and update references
+    - [ ] Rename `TOLOOKS.md` → `tolooks.md` and update references
+    - [ ] Rename `daily-changes/AGENTS.md` → `daily-changes/agents.md` and update references
+
 ## Resolved Architectural Decisions
 
 - [x] **6. Migrate Root Scripts into `path/` and `scripts/` Directories**
