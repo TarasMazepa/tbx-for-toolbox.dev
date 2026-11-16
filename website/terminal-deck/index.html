@@ -2145,7 +2145,7 @@
     const versionRefreshBtn = document.getElementById('versionRefreshBtn');
     const versionDismissBtn = document.getElementById('versionDismissBtn');
 
-    function getVersionStatus(backendVersion, backendCommitTs = null, backendCommitShort = null) {
+    function getVersionStatus(backendVersion, backendCommitTs = null, backendCommitShort = null, repoCommitTs = null, repoCommitShort = null) {
       if (backendVersion === null || backendVersion === undefined) {
         return { compatible: true, state: 'unknown', message: '' };
       }
@@ -2161,6 +2161,16 @@
           compatible: false,
           state: 'frontend-outdated',
           message: `Frontend outdated (API v${FRONTEND_API_VERSION}, backend is v${backendVersion}) — refresh this page or update your frontend.`
+        };
+      }
+      if (typeof backendCommitTs === 'number' && typeof repoCommitTs === 'number' &&
+          (repoCommitTs > backendCommitTs || (repoCommitShort && backendCommitShort && repoCommitShort !== backendCommitShort))) {
+        const beLabel = backendCommitShort || String(backendCommitTs);
+        const repoLabel = repoCommitShort || String(repoCommitTs);
+        return {
+          compatible: false,
+          state: 'backend-outdated',
+          message: `Local git repo updated (${beLabel} → ${repoLabel}) — restart tbx-terminal-deck.js on your Mac.`
         };
       }
       if (FRONTEND_COMMIT_TS !== null && typeof backendCommitTs === 'number') {
@@ -2207,9 +2217,9 @@
       }
     }
 
-    function updateVersionBanner(backendVersion, backendCommitTs = null, backendCommitShort = null) {
+    function updateVersionBanner(backendVersion, backendCommitTs = null, backendCommitShort = null, repoCommitTs = null, repoCommitShort = null) {
       if (!versionBanner || !versionBannerText) return;
-      const status = getVersionStatus(backendVersion, backendCommitTs, backendCommitShort);
+      const status = getVersionStatus(backendVersion, backendCommitTs, backendCommitShort, repoCommitTs, repoCommitShort);
       const suppressedByRefresh = status.state === 'frontend-outdated' && wasRefreshRecentlyPerformed();
       if (status.compatible || versionDismissed || suppressedByRefresh) {
         versionBanner.hidden = true;
@@ -2386,13 +2396,22 @@
         const backendVersion = typeof info.apiVersion === 'number' ? info.apiVersion : 0;
         const backendCommitTs = typeof info.commitTimestamp === 'number' ? info.commitTimestamp : null;
         const backendCommitShort = info.commitShort || null;
-        connectedHostInfo = { ...info, apiVersion: backendVersion, commitTimestamp: backendCommitTs, commitShort: backendCommitShort };
+        const repoCommitTs = typeof info.repoCommitTimestamp === 'number' ? info.repoCommitTimestamp : null;
+        const repoCommitShort = info.repoCommitShort || null;
+        connectedHostInfo = {
+          ...info,
+          apiVersion: backendVersion,
+          commitTimestamp: backendCommitTs,
+          commitShort: backendCommitShort,
+          repoCommitTimestamp: repoCommitTs,
+          repoCommitShort: repoCommitShort
+        };
         saveHostEntry(effectiveUrl, {
           hostname: info.hostname || '',
           apiVersion: backendVersion,
           lastConnectedAt: Date.now(),
         });
-        updateVersionBanner(backendVersion, backendCommitTs, backendCommitShort);
+        updateVersionBanner(backendVersion, backendCommitTs, backendCommitShort, repoCommitTs, repoCommitShort);
         if (hostsModal && !hostsModal.hidden) renderHostsModal();
       } catch (e) {}
     }
@@ -2418,12 +2437,24 @@
             setKeyDispatchStage(data.windowId, data.stage);
             return;
           }
-          if (data && !Array.isArray(data) && typeof data.apiVersion === 'number' && !connectedHostInfo) {
-            updateVersionBanner(
-              data.apiVersion,
-              typeof data.commitTimestamp === 'number' ? data.commitTimestamp : null,
-              data.commitShort || null
-            );
+          if (data && !Array.isArray(data) && typeof data.apiVersion === 'number') {
+            const repoCommitTs = typeof data.repoCommitTimestamp === 'number' ? data.repoCommitTimestamp : null;
+            const repoCommitShort = data.repoCommitShort || null;
+            if (!connectedHostInfo ||
+                repoCommitTs !== (connectedHostInfo.repoCommitTimestamp ?? null) ||
+                repoCommitShort !== (connectedHostInfo.repoCommitShort ?? null)) {
+              if (connectedHostInfo) {
+                connectedHostInfo.repoCommitTimestamp = repoCommitTs;
+                connectedHostInfo.repoCommitShort = repoCommitShort;
+              }
+              updateVersionBanner(
+                data.apiVersion,
+                typeof data.commitTimestamp === 'number' ? data.commitTimestamp : null,
+                data.commitShort || null,
+                repoCommitTs,
+                repoCommitShort
+              );
+            }
           }
           currentWindows = Array.isArray(data) ? data : (data && data.windows ? data.windows : []);
           currentDisplays = Array.isArray(data) ? [] : (data && data.displays ? data.displays : []);
