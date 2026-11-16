@@ -2187,35 +2187,21 @@
     const DEPLOY_PROMPT_KEY = 'terminal_deck_deploy_prompt_at';
     const REFRESH_PERFORMED_KEY = 'terminal_deck_refresh_performed';
     const DEPLOY_PROMPT_INTERVAL_MS = 24 * 60 * 60 * 1000;
-    let latestPromptedCommitTs = null;
-    let latestPromptedApiVersion = null;
 
     function recordRefreshPerformed() {
-      const now = String(Date.now());
+      const now = Date.now();
       try {
-        localStorage.setItem(DEPLOY_PROMPT_KEY, now);
-        localStorage.setItem(REFRESH_PERFORMED_KEY, JSON.stringify({
-          at: Date.now(),
-          commitTs: latestPromptedCommitTs,
-          apiVersion: latestPromptedApiVersion
-        }));
+        localStorage.setItem(DEPLOY_PROMPT_KEY, String(now));
+        localStorage.setItem(REFRESH_PERFORMED_KEY, JSON.stringify({ at: now }));
       } catch (e) {}
     }
 
-    function wasRefreshRecentlyPerformed(commitTs = null, apiVersion = null) {
+    function wasRefreshRecentlyPerformed() {
       try {
         const raw = localStorage.getItem(REFRESH_PERFORMED_KEY);
         if (!raw) return false;
         const parsed = JSON.parse(raw);
-        if (!parsed || typeof parsed.at !== 'number') return false;
-        if ((Date.now() - parsed.at) >= DEPLOY_PROMPT_INTERVAL_MS) return false;
-        if (typeof commitTs === 'number' && typeof parsed.commitTs === 'number' && commitTs > parsed.commitTs) {
-          return false;
-        }
-        if (typeof apiVersion === 'number' && typeof parsed.apiVersion === 'number' && apiVersion > parsed.apiVersion) {
-          return false;
-        }
-        return true;
+        return Boolean(parsed && typeof parsed.at === 'number' && (Date.now() - parsed.at) < DEPLOY_PROMPT_INTERVAL_MS);
       } catch (e) {
         return false;
       }
@@ -2224,13 +2210,10 @@
     function updateVersionBanner(backendVersion, backendCommitTs = null, backendCommitShort = null) {
       if (!versionBanner || !versionBannerText) return;
       const status = getVersionStatus(backendVersion, backendCommitTs, backendCommitShort);
-      const suppressedByRefresh = status.state === 'frontend-outdated' &&
-        wasRefreshRecentlyPerformed(backendCommitTs, backendVersion);
+      const suppressedByRefresh = status.state === 'frontend-outdated' && wasRefreshRecentlyPerformed();
       if (status.compatible || versionDismissed || suppressedByRefresh) {
         versionBanner.hidden = true;
       } else {
-        if (typeof backendCommitTs === 'number') latestPromptedCommitTs = backendCommitTs;
-        if (typeof backendVersion === 'number') latestPromptedApiVersion = backendVersion;
         versionBannerText.textContent = `⚠️ ${status.message}`;
         if (versionRefreshBtn) {
           versionRefreshBtn.hidden = status.state !== 'frontend-outdated';
@@ -2260,15 +2243,14 @@
       try {
         const lastPrompt = parseInt(localStorage.getItem(DEPLOY_PROMPT_KEY) || '0', 10);
         if (lastPrompt && (Date.now() - lastPrompt) < DEPLOY_PROMPT_INTERVAL_MS) return;
+        if (wasRefreshRecentlyPerformed()) return;
 
         const res = await fetch(`/commit-timestamp.txt?t=${Date.now()}`, { cache: 'no-store' });
         if (!res.ok) return;
         const text = (await res.text()).trim();
         if (!/^\d+$/.test(text)) return;
         const deployedTs = parseInt(text, 10);
-        if (wasRefreshRecentlyPerformed(deployedTs, null)) return;
         if (deployedTs > FRONTEND_COMMIT_TS && versionBanner && versionBannerText) {
-          latestPromptedCommitTs = deployedTs;
           localStorage.setItem(DEPLOY_PROMPT_KEY, String(Date.now()));
           versionDismissed = false;
           versionBannerText.textContent = '⚠️ A newer version of Terminal Spatial Remote is deployed — refresh this page.';
