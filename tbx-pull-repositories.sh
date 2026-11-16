@@ -1,1 +1,0 @@
-path/tbx-pull-repositories.sh

@@ -1,1 +1,0 @@
-path/tbx-gh-prs.sh
