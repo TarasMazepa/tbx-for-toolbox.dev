@@ -355,6 +355,17 @@ function getServerCommitInfo() {
   }
 }
 const SERVER_COMMIT_INFO = getServerCommitInfo();
+let latestRepoCommitInfo = { ...SERVER_COMMIT_INFO };
+const REPO_COMMIT_CHECK_INTERVAL_MS = 30000;
+
+function refreshRepoCommitInfo() {
+  const next = getServerCommitInfo();
+  const changed = next.timestamp !== latestRepoCommitInfo.timestamp || next.short !== latestRepoCommitInfo.short;
+  if (changed) {
+    latestRepoCommitInfo = next;
+  }
+  return changed;
+}
 
 /**
  * Build the hosted Terminal Deck URL with the ?host= parameter pointing to this daemon's LAN address.
@@ -920,6 +931,8 @@ function fetchTerminalState() {
         apiVersion: API_VERSION,
         commitTimestamp: SERVER_COMMIT_INFO.timestamp,
         commitShort: SERVER_COMMIT_INFO.short,
+        repoCommitTimestamp: latestRepoCommitInfo.timestamp,
+        repoCommitShort: latestRepoCommitInfo.short,
         windows: enriched,
         displays: displays
       };
@@ -928,11 +941,11 @@ function fetchTerminalState() {
     }
     return lastKnownGoodState && lastKnownGoodState.windows && lastKnownGoodState.windows.length
       ? lastKnownGoodState
-      : { apiVersion: API_VERSION, commitTimestamp: SERVER_COMMIT_INFO.timestamp, commitShort: SERVER_COMMIT_INFO.short, windows: [], displays: displays };
+      : { apiVersion: API_VERSION, commitTimestamp: SERVER_COMMIT_INFO.timestamp, commitShort: SERVER_COMMIT_INFO.short, repoCommitTimestamp: latestRepoCommitInfo.timestamp, repoCommitShort: latestRepoCommitInfo.short, windows: [], displays: displays };
   } catch (err) {
     return lastKnownGoodState && lastKnownGoodState.windows
       ? lastKnownGoodState
-      : { apiVersion: API_VERSION, commitTimestamp: SERVER_COMMIT_INFO.timestamp, commitShort: SERVER_COMMIT_INFO.short, windows: [], displays: [] };
+      : { apiVersion: API_VERSION, commitTimestamp: SERVER_COMMIT_INFO.timestamp, commitShort: SERVER_COMMIT_INFO.short, repoCommitTimestamp: latestRepoCommitInfo.timestamp, repoCommitShort: latestRepoCommitInfo.short, windows: [], displays: [] };
   }
 }
 
@@ -1129,7 +1142,12 @@ function computeStateHash(state) {
     actionRequired: w.agyState ? w.agyState.actionRequired : false,
     preview: w.name.includes('tbx-terminal-deck') ? '' : w.preview
   }));
-  return crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
+  const payload = {
+    windows: normalized,
+    repoCommitTimestamp: state && state.repoCommitTimestamp ? state.repoCommitTimestamp : null,
+    repoCommitShort: state && state.repoCommitShort ? state.repoCommitShort : null
+  };
+  return crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
 }
 
 /**
@@ -1241,6 +1259,8 @@ const server = http.createServer(async (req, res) => {
       apiVersion: API_VERSION,
       commitTimestamp: SERVER_COMMIT_INFO.timestamp,
       commitShort: SERVER_COMMIT_INFO.short,
+      repoCommitTimestamp: latestRepoCommitInfo.timestamp,
+      repoCommitShort: latestRepoCommitInfo.short,
       hostname,
       port: PORT,
       localUrl: `http://localhost:${PORT}`,
@@ -1386,6 +1406,11 @@ module.exports = {
 if (require.main === module) {
   // Periodic background change detection
   const checkTimer = setInterval(pollAndBroadcast, POLL_INTERVAL_MS);
+  const repoCommitTimer = setInterval(() => {
+    if (refreshRepoCommitInfo()) {
+      pollAndBroadcast();
+    }
+  }, REPO_COMMIT_CHECK_INTERVAL_MS);
 
   // Heartbeat keep-alive every 15s to keep connections healthy
   const heartbeatTimer = setInterval(() => {
@@ -1444,6 +1469,7 @@ if (require.main === module) {
   function shutdown() {
     console.log('\nShutting down server...');
     clearInterval(checkTimer);
+    clearInterval(repoCommitTimer);
     clearInterval(heartbeatTimer);
 
     for (const res of sseClients) {
