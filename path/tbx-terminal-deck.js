@@ -343,9 +343,9 @@ const JXA_POLL_INTERVAL_MS = 1200;
 const HOSTED_URL = 'https://tbx-for-toolbox.dev/terminal-deck/';
 const API_VERSION = 1;
 
-function getServerCommitInfo() {
+function getCommitInfoForRef(ref) {
   try {
-    const out = execFileSync('git', ['-C', __dirname, 'show', '-s', '--format=%ct:%h', 'HEAD'], {
+    const out = execFileSync('git', ['-C', __dirname, 'show', '-s', '--format=%ct:%h', ref], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
       timeout: 1000
@@ -354,8 +354,14 @@ function getServerCommitInfo() {
     const ts = /^\d+$/.test(tsStr) ? parseInt(tsStr, 10) : null;
     return { timestamp: ts, short: shortSha || null };
   } catch (_) {
-    return { timestamp: null, short: null };
+    return null;
   }
+}
+
+function getServerCommitInfo() {
+  return getCommitInfoForRef('refs/heads/main') ||
+         getCommitInfoForRef('HEAD') ||
+         { timestamp: null, short: null };
 }
 const SERVER_COMMIT_INFO = getServerCommitInfo();
 let latestRepoCommitInfo = { ...SERVER_COMMIT_INFO };
