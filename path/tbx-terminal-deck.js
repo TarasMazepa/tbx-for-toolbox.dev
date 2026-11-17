@@ -22,11 +22,13 @@
 
 const http = require('http');
 const https = require('https');
+const net = require('net');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { execFileSync, execFile } = require('child_process');
 const crypto = require('crypto');
+const { StringDecoder } = require('string_decoder');
 
 
 /**
@@ -336,7 +338,8 @@ function generateQrSvg(text) {
 }
 
 const PORT = parseInt(process.env.PORT || '8999', 10);
-const POLL_INTERVAL_MS = 600;
+const POLL_INTERVAL_MS = 120;
+const JXA_POLL_INTERVAL_MS = 1200;
 const HOSTED_URL = 'https://tbx-for-toolbox.dev/terminal-deck/';
 const API_VERSION = 1;
 
@@ -788,11 +791,65 @@ function getKittySockets() {
   return sockets;
 }
 
+const KITTY_DCS_PREFIX = '\x1bP@kitty-cmd';
+const KITTY_DCS_SUFFIX = '\x1b\\';
+
 /**
- * Query Kitty windows, active tab panes, and screen text via `kitten @`,
+ * Send a remote-control command directly to a Kitty Unix socket without spawning `kitten`.
+ */
+function kittySocketCommand(sock, cmd, payload = {}, timeoutMs = 800) {
+  const sockPath = sock.startsWith('unix:') ? sock.slice(5) : sock;
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const client = net.createConnection(sockPath);
+    const decoder = new StringDecoder('utf8');
+    let buf = '';
+
+    const finish = (err, data) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      client.destroy();
+      if (err) reject(err);
+      else resolve(data);
+    };
+
+    const timer = setTimeout(() => finish(new Error(`Kitty socket timeout (${cmd})`)), timeoutMs);
+
+    client.on('connect', () => {
+      const msg = JSON.stringify({ cmd, version: [0, 35, 0], no_response: false, payload });
+      client.write(`${KITTY_DCS_PREFIX}${msg}${KITTY_DCS_SUFFIX}`);
+    });
+
+    client.on('data', (chunk) => {
+      buf += decoder.write(chunk);
+      const start = buf.indexOf(KITTY_DCS_PREFIX);
+      if (start === -1) return;
+      const end = buf.indexOf(KITTY_DCS_SUFFIX, start + KITTY_DCS_PREFIX.length);
+      if (end === -1) return;
+
+      try {
+        const json = JSON.parse(buf.slice(start + KITTY_DCS_PREFIX.length, end));
+        if (!json.ok) {
+          finish(new Error(json.error || `Kitty command failed: ${cmd}`));
+        } else {
+          finish(null, json.data);
+        }
+      } catch (err) {
+        finish(err);
+      }
+    });
+
+    client.on('error', (err) => finish(err));
+    client.on('end', () => finish(new Error(`Kitty socket closed before response (${cmd})`)));
+  });
+}
+
+/**
+ * Query Kitty windows, active tab panes, and screen text directly over Kitty Unix sockets,
  * matching each OS window to its macOS CoreGraphics window geometry by platform_window_id.
  */
-function fetchKittyWindows(kittyCGWindows = []) {
+async function fetchKittyWindows(kittyCGWindows = []) {
   const sockets = getKittySockets();
   if (!sockets.length) return [];
 
@@ -801,25 +858,20 @@ function fetchKittyWindows(kittyCGWindows = []) {
     if (typeof w.id === 'number') cgById.set(w.id, w);
   }
 
-  const results = [];
   const shellNames = new Set(['zsh', 'bash', 'fish', 'sh', '-zsh', '-bash', '-fish', 'login']);
-
-  for (const sock of sockets) {
+  const socketResults = await Promise.all(sockets.map(async (sock) => {
     const sockName = path.basename(sock.replace(/^unix:/, ''));
     let osWindows = [];
     try {
-      const raw = execFileSync('kitten', ['@', '--to', sock, 'ls'], {
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'ignore'],
-        timeout: 1000
-      });
-      osWindows = JSON.parse(raw.trim());
+      const raw = await kittySocketCommand(sock, 'ls', {}, 1000);
+      osWindows = JSON.parse(String(raw).trim());
     } catch (_) {
-      continue;
+      return [];
     }
 
-    if (!Array.isArray(osWindows)) continue;
+    if (!Array.isArray(osWindows)) return [];
 
+    const paneTasks = [];
     for (let osIdx = 0; osIdx < osWindows.length; osIdx++) {
       const osWin = osWindows[osIdx];
       const tabs = Array.isArray(osWin.tabs) ? osWin.tabs : [];
@@ -838,76 +890,110 @@ function fetchKittyWindows(kittyCGWindows = []) {
 
       for (let pIdx = 0; pIdx < panes.length; pIdx++) {
         const pane = panes[pIdx];
-        let preview = '';
-        let analysis = '';
-        try {
-          const text = execFileSync('kitten', ['@', '--to', sock, 'get-text', '--match', `id:${pane.id}`, '--extent', 'screen'], {
-            encoding: 'utf8',
-            stdio: ['ignore', 'pipe', 'ignore'],
-            timeout: 800
+        paneTasks.push((async () => {
+          let preview = '';
+          let analysis = '';
+          try {
+            const text = await kittySocketCommand(sock, 'get-text', {
+              match: `id:${pane.id}`,
+              extent: 'screen'
+            }, 800);
+            if (text) {
+              const nonEmpty = String(text).split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+              analysis = nonEmpty.slice(-14).join('\n');
+              preview = nonEmpty.slice(-60).join('\n');
+            }
+          } catch (_) {}
+
+          const fgProcs = Array.isArray(pane.foreground_processes) ? pane.foreground_processes : [];
+          const busy = fgProcs.some(p => {
+            const cmd = Array.isArray(p.cmdline) && p.cmdline[0] ? path.basename(p.cmdline[0]) : '';
+            return cmd && !shellNames.has(cmd);
           });
-          if (text) {
-            const nonEmpty = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
-            analysis = nonEmpty.slice(-14).join('\n');
-            preview = nonEmpty.slice(-60).join('\n');
-          }
-        } catch (_) {}
+          const paneCwd = (fgProcs.find(p => p && p.cwd) || {}).cwd || pane.cwd || '';
+          const folderName = paneCwd ? (path.basename(paneCwd) || paneCwd) : '';
+          const titlePart = pane.title || activeTab.title || `kitty #${pane.id}`;
+          const sizePart = pane.columns && pane.lines ? `${pane.columns}×${pane.lines}` : '';
+          const nameParts = [];
+          if (folderName) nameParts.push(folderName);
+          if (titlePart && titlePart !== folderName) nameParts.push(titlePart);
+          if (sizePart) nameParts.push(sizePart);
 
-        const fgProcs = Array.isArray(pane.foreground_processes) ? pane.foreground_processes : [];
-        const busy = fgProcs.some(p => {
-          const cmd = Array.isArray(p.cmdline) && p.cmdline[0] ? path.basename(p.cmdline[0]) : '';
-          return cmd && !shellNames.has(cmd);
-        });
-        const paneCwd = (fgProcs.find(p => p && p.cwd) || {}).cwd || pane.cwd || '';
-        const folderName = paneCwd ? (path.basename(paneCwd) || paneCwd) : '';
-        const titlePart = pane.title || activeTab.title || `kitty #${pane.id}`;
-        const sizePart = pane.columns && pane.lines ? `${pane.columns}×${pane.lines}` : '';
-        const nameParts = [];
-        if (folderName) nameParts.push(folderName);
-        if (titlePart && titlePart !== folderName) nameParts.push(titlePart);
-        if (sizePart) nameParts.push(sizePart);
-
-        results.push({
-          id: `kitty:${sockName}:${pane.id}`,
-          name: nameParts.join(' — ') || `kitty #${pane.id}`,
-          index: osWin.is_focused && pane.is_focused ? 1 : osIdx + 2,
-          position: {
-            x: basePos.x + (pIdx * paneWidth),
-            y: basePos.y
-          },
-          size: {
-            width: panes.length === 1 ? baseSize.width : paneWidth,
-            height: baseSize.height
-          },
-          cols: pane.columns || null,
-          rows: pane.lines || null,
-          tty: null,
-          busy,
-          preview,
-          analysis
-        });
+          return {
+            id: `kitty:${sockName}:${pane.id}`,
+            name: nameParts.join(' — ') || `kitty #${pane.id}`,
+            index: osWin.is_focused && pane.is_focused ? 1 : osIdx + 2,
+            position: {
+              x: basePos.x + (pIdx * paneWidth),
+              y: basePos.y
+            },
+            size: {
+              width: panes.length === 1 ? baseSize.width : paneWidth,
+              height: baseSize.height
+            },
+            cols: pane.columns || null,
+            rows: pane.lines || null,
+            tty: null,
+            busy,
+            preview,
+            analysis
+          };
+        })());
       }
     }
+
+    return Promise.all(paneTasks);
+  }));
+
+  return socketResults.flat();
+}
+
+let lastJxaResult = { rawTerminalWindows: [], displays: [], sysKittyWindows: [] };
+let lastJxaFetchAt = 0;
+
+/**
+ * Query Terminal.app windows, displays, and Kitty CoreGraphics bounds asynchronously via JXA,
+ * caching results for JXA_POLL_INTERVAL_MS so fast Kitty socket polling isn't bottlenecked.
+ */
+function fetchJxaState(force = false) {
+  const now = Date.now();
+  if (!force && lastJxaFetchAt > 0 && (now - lastJxaFetchAt) < JXA_POLL_INTERVAL_MS) {
+    return Promise.resolve(lastJxaResult);
   }
 
-  return results;
+  return new Promise((resolve, reject) => {
+    execFile('osascript', ['-l', 'JavaScript', '-e', JXA_FETCH_SCRIPT], {
+      encoding: 'utf8',
+      timeout: 2500
+    }, (err, stdout) => {
+      if (err) {
+        if (lastJxaFetchAt > 0) return resolve(lastJxaResult);
+        return reject(err);
+      }
+      try {
+        const parsed = JSON.parse(stdout.trim());
+        lastJxaResult = {
+          rawTerminalWindows: Array.isArray(parsed) ? parsed : (parsed && parsed.windows ? parsed.windows : []),
+          displays: Array.isArray(parsed) ? [] : (parsed && parsed.displays ? parsed.displays : []),
+          sysKittyWindows: Array.isArray(parsed) ? [] : (parsed && parsed.kittyWindows ? parsed.kittyWindows : [])
+        };
+        lastJxaFetchAt = Date.now();
+        resolve(lastJxaResult);
+      } catch (parseErr) {
+        if (lastJxaFetchAt > 0) return resolve(lastJxaResult);
+        reject(parseErr);
+      }
+    });
+  });
 }
 
 /**
  * Query current Terminal.app & Kitty windows and multi-monitor display state
  */
-function fetchTerminalState() {
+async function fetchTerminalState({ forceJxa = false } = {}) {
   try {
-    const raw = execFileSync('osascript', ['-l', 'JavaScript', '-e', JXA_FETCH_SCRIPT], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-      timeout: 2500
-    });
-    const parsed = JSON.parse(raw.trim());
-    const rawTerminalWindows = Array.isArray(parsed) ? parsed : (parsed && parsed.windows ? parsed.windows : []);
-    const displays = Array.isArray(parsed) ? [] : (parsed && parsed.displays ? parsed.displays : []);
-    const sysKittyWindows = Array.isArray(parsed) ? [] : (parsed && parsed.kittyWindows ? parsed.kittyWindows : []);
-    const rawKittyWindows = fetchKittyWindows(sysKittyWindows);
+    const { rawTerminalWindows, displays, sysKittyWindows } = await fetchJxaState(forceJxa);
+    const rawKittyWindows = await fetchKittyWindows(sysKittyWindows);
     const rawWindows = [...rawTerminalWindows, ...rawKittyWindows];
 
     if (Array.isArray(rawWindows)) {
@@ -1289,7 +1375,7 @@ const server = http.createServer(async (req, res) => {
 
   // Endpoint: GET /terminals (JSON snapshot)
   if (url.pathname === '/terminals' && req.method === 'GET') {
-    const terminals = fetchTerminalState();
+    const terminals = await fetchTerminalState({ forceJxa: true });
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(terminals, null, 2));
     return;
@@ -1304,12 +1390,15 @@ const server = http.createServer(async (req, res) => {
       'X-Accel-Buffering': 'no'
     });
 
-    // Send immediate initial state
-    const current = fetchTerminalState();
-    res.write(`data: ${JSON.stringify(current)}\n\n`);
-
     sseClients.add(res);
     console.log(`[+] Client connected to /events (${sseClients.size} active)`);
+    ensurePolling();
+
+    // Send immediate initial state
+    const current = await fetchTerminalState({ forceJxa: true });
+    if (!res.destroyed && sseClients.has(res)) {
+      res.write(`data: ${JSON.stringify(current)}\n\n`);
+    }
 
     req.on('close', () => {
       sseClients.delete(res);
@@ -1346,7 +1435,7 @@ const server = http.createServer(async (req, res) => {
         if (sseClients.size > 0) {
           broadcast(JSON.stringify({ type: 'key_status', windowId: targetWindowId, key: targetKey, stage: 'error', error: 'Focus lost before keystroke' }));
         }
-        setTimeout(pollAndBroadcast, 150);
+        setTimeout(() => pollAndBroadcast({ forceJxa: true }), 150);
         res.writeHead(409, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(result));
         return;
@@ -1358,7 +1447,7 @@ const server = http.createServer(async (req, res) => {
       if (sseClients.size > 0) {
         broadcast(JSON.stringify({ type: 'key_status', windowId: targetWindowId, key: targetKey, stage: 'completed' }));
       }
-      setTimeout(pollAndBroadcast, 150);
+      setTimeout(() => pollAndBroadcast({ forceJxa: true }), 150);
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(result));
@@ -1378,19 +1467,43 @@ const server = http.createServer(async (req, res) => {
   res.end(JSON.stringify({ error: 'Not found', routes: ['/', '/terminals', '/events', '/api/key'] }));
 });
 
-function pollAndBroadcast() {
-  const current = fetchTerminalState();
-  const hash = computeStateHash(current);
+let pollTimer = null;
+let pollInFlight = false;
 
-  if (hash !== lastStateHash) {
-    lastStateHash = hash;
-    lastStateJson = JSON.stringify(current);
+async function pollAndBroadcast({ forceJxa = false } = {}) {
+  if (pollInFlight) return;
+  pollInFlight = true;
+  try {
+    const current = await fetchTerminalState({ forceJxa });
+    const hash = computeStateHash(current);
 
-    if (sseClients.size > 0) {
-      const winCount = current.windows ? current.windows.length : (Array.isArray(current) ? current.length : 0);
-      console.log(`[⚡] Window update detected (${winCount} window(s)) -> Broadcasting to ${sseClients.size} client(s)`);
-      broadcast(lastStateJson);
+    if (hash !== lastStateHash) {
+      lastStateHash = hash;
+      lastStateJson = JSON.stringify(current);
+
+      if (sseClients.size > 0) {
+        const winCount = current.windows ? current.windows.length : (Array.isArray(current) ? current.length : 0);
+        console.log(`[⚡] Window update detected (${winCount} window(s)) -> Broadcasting to ${sseClients.size} client(s)`);
+        broadcast(lastStateJson);
+      }
     }
+  } finally {
+    pollInFlight = false;
+  }
+}
+
+async function pollLoop() {
+  pollTimer = null;
+  if (sseClients.size === 0) return;
+  await pollAndBroadcast();
+  if (sseClients.size > 0) {
+    pollTimer = setTimeout(pollLoop, POLL_INTERVAL_MS);
+  }
+}
+
+function ensurePolling() {
+  if (pollTimer === null && sseClients.size > 0) {
+    pollTimer = setTimeout(pollLoop, POLL_INTERVAL_MS);
   }
 }
 
@@ -1401,13 +1514,13 @@ module.exports = {
   getHostedPhoneUrl,
   isHostedUrlReachable,
   getDesktopOpenUrl,
+  kittySocketCommand,
 };
 
 if (require.main === module) {
-  // Periodic background change detection
-  const checkTimer = setInterval(pollAndBroadcast, POLL_INTERVAL_MS);
+  // Periodic background repo commit check (only broadcasts when SSE clients are connected)
   const repoCommitTimer = setInterval(() => {
-    if (refreshRepoCommitInfo()) {
+    if (refreshRepoCommitInfo() && sseClients.size > 0) {
       pollAndBroadcast();
     }
   }, REPO_COMMIT_CHECK_INTERVAL_MS);
@@ -1468,7 +1581,10 @@ if (require.main === module) {
   // Clean and instant shutdown on Ctrl+C (SIGINT) or SIGTERM
   function shutdown() {
     console.log('\nShutting down server...');
-    clearInterval(checkTimer);
+    if (pollTimer !== null) {
+      clearTimeout(pollTimer);
+      pollTimer = null;
+    }
     clearInterval(repoCommitTimer);
     clearInterval(heartbeatTimer);
 
