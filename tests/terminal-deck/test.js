@@ -81,3 +81,21 @@ test('generateQrSvg renders a valid SVG QR code for hosted URL', () => {
   assert.ok(svg.includes('<rect x="2" y="2" width="1" height="1"'));
   assert.ok(svg.endsWith('</svg>'));
 });
+
+test('detectAgyState detects navigation prompt within the last 3 meaningful lines', () => {
+  const textWithTwoTrailingStatusLines = [
+    'Requesting permission for:',
+    '   stax status',
+    'Run this command?',
+    '> 1. Yes, run command',
+    '  2. No, cancel',
+    '',
+    '  ↑/↓ Navigate · tab Amend · ctrl+g edit/expand command',
+    'esc to cancel                                                                   auto · Gemini 4 Argon · low',
+    '~/tbx-for-toolbox.dev (main)                                                                        context: 12%',
+  ].join('\n');
+
+  const result = detectAgyState('agy', textWithTwoTrailingStatusLines, 113);
+  assert.equal(result.actionRequired, true);
+  assert.equal(result.status, 'action_required');
+});

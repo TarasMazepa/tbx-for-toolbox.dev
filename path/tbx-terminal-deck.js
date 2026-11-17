@@ -477,7 +477,7 @@ let lastKnownGoodState = { windows: [], displays: [] };
 /**
  * Detect Antigravity CLI state from window name, terminal buffer text, and terminal column width.
  * Specifically checks for "Navigate" (e.g. "↑/↓ Navigate · tab Amend · ctrl+g edit/expand command")
- * within the last two strings of the terminal screen, using terminal width from window name / tab
+ * within the last three strings of the terminal screen, using terminal width from window name / tab
  * to cleanly segment lines.
  */
 function detectAgyState(windowName, analysisText, cols) {
@@ -522,10 +522,10 @@ function detectAgyState(windowName, analysisText, cols) {
   // Meaningful lines exclude horizontal rules (e.g. ───────, -------, =======)
   const meaningful = trimmed.filter(l => !/^[─\-_=*]+$/.test(l));
 
-  // Check for Antigravity's interactive navigation prompt in the last two meaningful lines,
+  // Check for Antigravity's interactive navigation prompt in the last three meaningful lines,
   // excluding input autocomplete popups (e.g. "↑/↓ Navigate · enter Select · tab Complete")
   const isActionRequired = meaningful
-    .slice(-2)
+    .slice(-3)
     .some(line => !line.includes('tab Complete') && line.includes('↑/↓ Navigate'));
 
   if (isActionRequired) {
