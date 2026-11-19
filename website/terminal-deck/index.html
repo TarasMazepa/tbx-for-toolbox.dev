@@ -2146,7 +2146,7 @@
     const versionRefreshBtn = document.getElementById('versionRefreshBtn');
     const versionDismissBtn = document.getElementById('versionDismissBtn');
 
-    function getVersionStatus(backendVersion, backendCommitTs = null, backendCommitShort = null, repoCommitTs = null, repoCommitShort = null) {
+    function getVersionStatus(backendVersion, backendCommitTs = null, backendCommitShort = null, repoCommitTs = null, repoCommitShort = null, remoteMainUpdate = null) {
       if (backendVersion === null || backendVersion === undefined) {
         return { compatible: true, state: 'unknown', message: '' };
       }
@@ -2172,6 +2172,14 @@
           compatible: false,
           state: 'backend-outdated',
           message: `Local git repo updated (${beLabel} → ${repoLabel}) — restart tbx-terminal-deck.js on your Mac.`
+        };
+      }
+      if (remoteMainUpdate && remoteMainUpdate.available) {
+        const remoteLabel = remoteMainUpdate.short || 'origin/main';
+        return {
+          compatible: false,
+          state: 'remote-update-available',
+          message: `Update available on origin/main (${remoteLabel}) — rerun: tbx-terminal-deck.js --update`
         };
       }
       if (FRONTEND_COMMIT_TS !== null && typeof backendCommitTs === 'number') {
@@ -2218,9 +2226,9 @@
       }
     }
 
-    function updateVersionBanner(backendVersion, backendCommitTs = null, backendCommitShort = null, repoCommitTs = null, repoCommitShort = null) {
+    function updateVersionBanner(backendVersion, backendCommitTs = null, backendCommitShort = null, repoCommitTs = null, repoCommitShort = null, remoteMainUpdate = null) {
       if (!versionBanner || !versionBannerText) return;
-      const status = getVersionStatus(backendVersion, backendCommitTs, backendCommitShort, repoCommitTs, repoCommitShort);
+      const status = getVersionStatus(backendVersion, backendCommitTs, backendCommitShort, repoCommitTs, repoCommitShort, remoteMainUpdate);
       const suppressedByRefresh = status.state === 'frontend-outdated' && wasRefreshRecentlyPerformed();
       if (status.compatible || versionDismissed || suppressedByRefresh) {
         versionBanner.hidden = true;
@@ -2399,20 +2407,22 @@
         const backendCommitShort = info.commitShort || null;
         const repoCommitTs = typeof info.repoCommitTimestamp === 'number' ? info.repoCommitTimestamp : null;
         const repoCommitShort = info.repoCommitShort || null;
+        const remoteMainUpdate = info.remoteMainUpdate || null;
         connectedHostInfo = {
           ...info,
           apiVersion: backendVersion,
           commitTimestamp: backendCommitTs,
           commitShort: backendCommitShort,
           repoCommitTimestamp: repoCommitTs,
-          repoCommitShort: repoCommitShort
+          repoCommitShort: repoCommitShort,
+          remoteMainUpdate: remoteMainUpdate
         };
         saveHostEntry(effectiveUrl, {
           hostname: info.hostname || '',
           apiVersion: backendVersion,
           lastConnectedAt: Date.now(),
         });
-        updateVersionBanner(backendVersion, backendCommitTs, backendCommitShort, repoCommitTs, repoCommitShort);
+        updateVersionBanner(backendVersion, backendCommitTs, backendCommitShort, repoCommitTs, repoCommitShort, remoteMainUpdate);
         if (hostsModal && !hostsModal.hidden) renderHostsModal();
       } catch (e) {}
     }
@@ -2441,19 +2451,26 @@
           if (data && !Array.isArray(data) && typeof data.apiVersion === 'number') {
             const repoCommitTs = typeof data.repoCommitTimestamp === 'number' ? data.repoCommitTimestamp : null;
             const repoCommitShort = data.repoCommitShort || null;
+            const remoteMainUpdate = data.remoteMainUpdate || null;
+            const prevRemote = connectedHostInfo ? connectedHostInfo.remoteMainUpdate : null;
+            const remoteChanged = Boolean(remoteMainUpdate?.available) !== Boolean(prevRemote?.available) ||
+                                  (remoteMainUpdate?.short || null) !== (prevRemote?.short || null);
             if (!connectedHostInfo ||
                 repoCommitTs !== (connectedHostInfo.repoCommitTimestamp ?? null) ||
-                repoCommitShort !== (connectedHostInfo.repoCommitShort ?? null)) {
+                repoCommitShort !== (connectedHostInfo.repoCommitShort ?? null) ||
+                remoteChanged) {
               if (connectedHostInfo) {
                 connectedHostInfo.repoCommitTimestamp = repoCommitTs;
                 connectedHostInfo.repoCommitShort = repoCommitShort;
+                connectedHostInfo.remoteMainUpdate = remoteMainUpdate;
               }
               updateVersionBanner(
                 data.apiVersion,
                 typeof data.commitTimestamp === 'number' ? data.commitTimestamp : null,
                 data.commitShort || null,
                 repoCommitTs,
-                repoCommitShort
+                repoCommitShort,
+                remoteMainUpdate
               );
             }
           }
