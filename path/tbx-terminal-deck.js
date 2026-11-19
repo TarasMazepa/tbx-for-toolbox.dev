@@ -341,7 +341,6 @@ const PORT = parseInt(process.env.PORT || '8999', 10);
 const POLL_INTERVAL_MS = 120;
 const JXA_POLL_INTERVAL_MS = 1200;
 const HOSTED_URL = 'https://tbx-for-toolbox.dev/terminal-deck/';
-const API_VERSION = 1;
 
 const RESTART_EXIT_CODE = 75;
 const GIT_UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
@@ -1153,7 +1152,6 @@ async function fetchTerminalState({ forceJxa = false } = {}) {
         };
       });
       const state = {
-        apiVersion: API_VERSION,
         commitTimestamp: SERVER_COMMIT_INFO.timestamp,
         commitShort: SERVER_COMMIT_INFO.short,
         repoCommitTimestamp: latestRepoCommitInfo.timestamp,
@@ -1167,11 +1165,11 @@ async function fetchTerminalState({ forceJxa = false } = {}) {
     }
     return lastKnownGoodState && lastKnownGoodState.windows && lastKnownGoodState.windows.length
       ? lastKnownGoodState
-      : { apiVersion: API_VERSION, commitTimestamp: SERVER_COMMIT_INFO.timestamp, commitShort: SERVER_COMMIT_INFO.short, repoCommitTimestamp: latestRepoCommitInfo.timestamp, repoCommitShort: latestRepoCommitInfo.short, remoteMainUpdate: remoteMainUpdate, windows: [], displays: displays };
+      : { commitTimestamp: SERVER_COMMIT_INFO.timestamp, commitShort: SERVER_COMMIT_INFO.short, repoCommitTimestamp: latestRepoCommitInfo.timestamp, repoCommitShort: latestRepoCommitInfo.short, remoteMainUpdate: remoteMainUpdate, windows: [], displays: displays };
   } catch (err) {
     return lastKnownGoodState && lastKnownGoodState.windows
       ? lastKnownGoodState
-      : { apiVersion: API_VERSION, commitTimestamp: SERVER_COMMIT_INFO.timestamp, commitShort: SERVER_COMMIT_INFO.short, repoCommitTimestamp: latestRepoCommitInfo.timestamp, repoCommitShort: latestRepoCommitInfo.short, remoteMainUpdate: remoteMainUpdate, windows: [], displays: [] };
+      : { commitTimestamp: SERVER_COMMIT_INFO.timestamp, commitShort: SERVER_COMMIT_INFO.short, repoCommitTimestamp: latestRepoCommitInfo.timestamp, repoCommitShort: latestRepoCommitInfo.short, remoteMainUpdate: remoteMainUpdate, windows: [], displays: [] };
   }
 }
 
@@ -1483,7 +1481,6 @@ const server = http.createServer(async (req, res) => {
     const hostname = os.hostname();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
-      apiVersion: API_VERSION,
       commitTimestamp: SERVER_COMMIT_INFO.timestamp,
       commitShort: SERVER_COMMIT_INFO.short,
       repoCommitTimestamp: latestRepoCommitInfo.timestamp,
@@ -1650,7 +1647,6 @@ function ensurePolling() {
 }
 
 module.exports = {
-  API_VERSION,
   RESTART_EXIT_CODE,
   detectAgyState,
   generateQrSvg,
