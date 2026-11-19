@@ -1078,7 +1078,6 @@
   </div>
 
   <script>
-    const FRONTEND_API_VERSION = 1;
     const RAW_FRONTEND_COMMIT_TS = '__COMMIT_TIMESTAMP__';
     const FRONTEND_COMMIT_TS = /^\d+$/.test(RAW_FRONTEND_COMMIT_TS) ? parseInt(RAW_FRONTEND_COMMIT_TS, 10) : null;
     const RAW_FRONTEND_COMMIT_SHORT = '__COMMIT_SHORT__';
@@ -1107,7 +1106,6 @@
           hosts.push({
             url,
             hostname: item && typeof item.hostname === 'string' ? item.hostname : '',
-            apiVersion: typeof (item && item.apiVersion) === 'number' ? item.apiVersion : null,
             lastConnectedAt: typeof (item && item.lastConnectedAt) === 'number' ? item.lastConnectedAt : 0,
           });
         }
@@ -1128,11 +1126,10 @@
       if (!url) return;
       const hosts = loadSavedHosts();
       const idx = hosts.findIndex(h => h.url === url);
-      const existing = idx >= 0 ? hosts[idx] : { url, hostname: '', apiVersion: null, lastConnectedAt: 0 };
+      const existing = idx >= 0 ? hosts[idx] : { url, hostname: '', lastConnectedAt: 0 };
       const updated = {
         url,
         hostname: meta.hostname !== undefined ? meta.hostname : existing.hostname,
-        apiVersion: meta.apiVersion !== undefined ? meta.apiVersion : existing.apiVersion,
         lastConnectedAt: meta.lastConnectedAt !== undefined ? meta.lastConnectedAt : existing.lastConnectedAt,
       };
       if (idx >= 0) hosts.splice(idx, 1);
@@ -2146,24 +2143,7 @@
     const versionRefreshBtn = document.getElementById('versionRefreshBtn');
     const versionDismissBtn = document.getElementById('versionDismissBtn');
 
-    function getVersionStatus(backendVersion, backendCommitTs = null, backendCommitShort = null, repoCommitTs = null, repoCommitShort = null, remoteMainUpdate = null) {
-      if (backendVersion === null || backendVersion === undefined) {
-        return { compatible: true, state: 'unknown', message: '' };
-      }
-      if (backendVersion < FRONTEND_API_VERSION) {
-        return {
-          compatible: false,
-          state: 'backend-outdated',
-          message: `Backend outdated (API v${backendVersion}, frontend expects v${FRONTEND_API_VERSION}) — update tbx-terminal-deck.js on your Mac.`
-        };
-      }
-      if (backendVersion > FRONTEND_API_VERSION) {
-        return {
-          compatible: false,
-          state: 'frontend-outdated',
-          message: `Frontend outdated (API v${FRONTEND_API_VERSION}, backend is v${backendVersion}) — refresh this page or update your frontend.`
-        };
-      }
+    function getVersionStatus(backendCommitTs = null, backendCommitShort = null, repoCommitTs = null, repoCommitShort = null, remoteMainUpdate = null) {
       if (typeof backendCommitTs === 'number' && typeof repoCommitTs === 'number' &&
           (repoCommitTs > backendCommitTs || (repoCommitShort && backendCommitShort && repoCommitShort !== backendCommitShort))) {
         const beLabel = backendCommitShort || String(backendCommitTs);
@@ -2182,25 +2162,7 @@
           message: `Update available on origin/main (${remoteLabel}) — rerun: tbx-terminal-deck.js --update`
         };
       }
-      if (FRONTEND_COMMIT_TS !== null && typeof backendCommitTs === 'number') {
-        const feLabel = FRONTEND_COMMIT_SHORT || String(FRONTEND_COMMIT_TS);
-        const beLabel = backendCommitShort || String(backendCommitTs);
-        if (backendCommitTs < FRONTEND_COMMIT_TS) {
-          return {
-            compatible: false,
-            state: 'backend-outdated',
-            message: `Server is on an older commit (${beLabel} vs ${feLabel}) — update or restart tbx-terminal-deck.js on your Mac.`
-          };
-        }
-        if (backendCommitTs > FRONTEND_COMMIT_TS) {
-          return {
-            compatible: false,
-            state: 'frontend-outdated',
-            message: `Frontend is on an older commit (${feLabel} vs ${beLabel}) — refresh this page.`
-          };
-        }
-      }
-      return { compatible: true, state: 'ok', message: `API v${backendVersion}` };
+      return { compatible: true, state: 'ok', message: '' };
     }
 
     const DEPLOY_PROMPT_KEY = 'terminal_deck_deploy_prompt_at';
@@ -2226,9 +2188,9 @@
       }
     }
 
-    function updateVersionBanner(backendVersion, backendCommitTs = null, backendCommitShort = null, repoCommitTs = null, repoCommitShort = null, remoteMainUpdate = null) {
+    function updateVersionBanner(backendCommitTs = null, backendCommitShort = null, repoCommitTs = null, repoCommitShort = null, remoteMainUpdate = null) {
       if (!versionBanner || !versionBannerText) return;
-      const status = getVersionStatus(backendVersion, backendCommitTs, backendCommitShort, repoCommitTs, repoCommitShort, remoteMainUpdate);
+      const status = getVersionStatus(backendCommitTs, backendCommitShort, repoCommitTs, repoCommitShort, remoteMainUpdate);
       const suppressedByRefresh = status.state === 'frontend-outdated' && wasRefreshRecentlyPerformed();
       if (status.compatible || versionDismissed || suppressedByRefresh) {
         versionBanner.hidden = true;
@@ -2264,7 +2226,7 @@
         if (lastPrompt && (Date.now() - lastPrompt) < DEPLOY_PROMPT_INTERVAL_MS) return;
         if (wasRefreshRecentlyPerformed()) return;
 
-        const res = await fetch(`/commit-timestamp.txt?t=${Date.now()}`, { cache: 'no-store' });
+        const res = await fetch(`./commit-timestamp.txt?t=${Date.now()}`, { cache: 'no-store' });
         if (!res.ok) return;
         const text = (await res.text()).trim();
         if (!/^\d+$/.test(text)) return;
@@ -2402,7 +2364,6 @@
         const res = await fetch(`${apiBase}/info`);
         if (!res.ok) return;
         const info = await res.json();
-        const backendVersion = typeof info.apiVersion === 'number' ? info.apiVersion : 0;
         const backendCommitTs = typeof info.commitTimestamp === 'number' ? info.commitTimestamp : null;
         const backendCommitShort = info.commitShort || null;
         const repoCommitTs = typeof info.repoCommitTimestamp === 'number' ? info.repoCommitTimestamp : null;
@@ -2410,7 +2371,6 @@
         const remoteMainUpdate = info.remoteMainUpdate || null;
         connectedHostInfo = {
           ...info,
-          apiVersion: backendVersion,
           commitTimestamp: backendCommitTs,
           commitShort: backendCommitShort,
           repoCommitTimestamp: repoCommitTs,
@@ -2419,10 +2379,9 @@
         };
         saveHostEntry(effectiveUrl, {
           hostname: info.hostname || '',
-          apiVersion: backendVersion,
           lastConnectedAt: Date.now(),
         });
-        updateVersionBanner(backendVersion, backendCommitTs, backendCommitShort, repoCommitTs, repoCommitShort, remoteMainUpdate);
+        updateVersionBanner(backendCommitTs, backendCommitShort, repoCommitTs, repoCommitShort, remoteMainUpdate);
         if (hostsModal && !hostsModal.hidden) renderHostsModal();
       } catch (e) {}
     }
@@ -2448,7 +2407,7 @@
             setKeyDispatchStage(data.windowId, data.stage);
             return;
           }
-          if (data && !Array.isArray(data) && typeof data.apiVersion === 'number') {
+          if (data && !Array.isArray(data)) {
             const repoCommitTs = typeof data.repoCommitTimestamp === 'number' ? data.repoCommitTimestamp : null;
             const repoCommitShort = data.repoCommitShort || null;
             const remoteMainUpdate = data.remoteMainUpdate || null;
@@ -2465,7 +2424,6 @@
                 connectedHostInfo.remoteMainUpdate = remoteMainUpdate;
               }
               updateVersionBanner(
-                data.apiVersion,
                 typeof data.commitTimestamp === 'number' ? data.commitTimestamp : null,
                 data.commitShort || null,
                 repoCommitTs,
@@ -2518,10 +2476,9 @@
           hostProbeResults.set(url, { status: 'offline' });
         } else {
           const info = await res.json();
-          const apiVersion = typeof info.apiVersion === 'number' ? info.apiVersion : 0;
           const hostname = info.hostname || '';
-          hostProbeResults.set(url, { status: 'online', apiVersion, hostname });
-          saveHostEntry(url, { hostname, apiVersion });
+          hostProbeResults.set(url, { status: 'online', hostname });
+          saveHostEntry(url, { hostname });
         }
       } catch (e) {
         clearTimeout(timer);
@@ -2534,13 +2491,9 @@
       if (!hostsSummary) return;
       const effectiveUrl = getEffectiveHostUrl();
       const stateLabel = isSseConnected ? 'Connected (Live)' : 'Disconnected';
-      const backendVersion = connectedHostInfo ? connectedHostInfo.apiVersion : null;
-      const verStatus = getVersionStatus(backendVersion);
-      const versionBadge = backendVersion === null
-        ? `Frontend API v${FRONTEND_API_VERSION}`
-        : (verStatus.compatible
-          ? `<span class="host-item-badge ok">API v${backendVersion} (Up to date)</span>`
-          : `<span class="host-item-badge warn">${escapeHtml(verStatus.state === 'backend-outdated' ? `Backend v${backendVersion} < v${FRONTEND_API_VERSION}` : `Frontend v${FRONTEND_API_VERSION} < v${backendVersion}`)}</span>`);
+      const commitBadge = connectedHostInfo && connectedHostInfo.commitShort
+        ? `<span class="host-item-badge ok">${escapeHtml(connectedHostInfo.commitShort)}</span>`
+        : '';
 
       hostsSummary.innerHTML = `
         <div class="hosts-summary-row">
@@ -2549,7 +2502,7 @@
         </div>
         <div class="hosts-summary-row">
           <span class="hosts-summary-url">${escapeHtml(effectiveUrl)}</span>
-          <span>${versionBadge}</span>
+          <span>${commitBadge}</span>
         </div>
       `;
     }
@@ -2562,7 +2515,6 @@
         saved.unshift({
           url: effectiveUrl,
           hostname: connectedHostInfo && connectedHostInfo.hostname ? connectedHostInfo.hostname : '',
-          apiVersion: connectedHostInfo ? connectedHostInfo.apiVersion : null,
           lastConnectedAt: 0,
         });
       }
@@ -2584,17 +2536,13 @@
           else if (probe.status === 'checking') dotClass = 'status-dot checking';
         }
 
-        const displayVersion = isActive && connectedHostInfo
-          ? connectedHostInfo.apiVersion
-          : (probe && typeof probe.apiVersion === 'number' ? probe.apiVersion : host.apiVersion);
         const displayName = (isActive && connectedHostInfo && connectedHostInfo.hostname)
           || (probe && probe.hostname)
           || host.hostname
           || host.url;
 
-        const verStatus = getVersionStatus(displayVersion);
-        const verBadgeHtml = typeof displayVersion === 'number'
-          ? `<span class="host-item-badge ${verStatus.compatible ? 'ok' : 'warn'}">API v${displayVersion}</span>`
+        const verBadgeHtml = (isActive && isSseConnected) || (probe && probe.status === 'online')
+          ? '<span class="host-item-badge ok">Online</span>'
           : '';
 
         const row = document.createElement('div');
