@@ -26,7 +26,7 @@ const net = require('net');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { execFileSync, execFile } = require('child_process');
+const { execFileSync, execFile, spawn, spawnSync } = require('child_process');
 const crypto = require('crypto');
 const { StringDecoder } = require('string_decoder');
 
@@ -343,37 +343,138 @@ const JXA_POLL_INTERVAL_MS = 1200;
 const HOSTED_URL = 'https://tbx-for-toolbox.dev/terminal-deck/';
 const API_VERSION = 1;
 
-function getCommitInfoForRef(ref) {
+const RESTART_EXIT_CODE = 75;
+const GIT_UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
+
+function getRealScriptPath() {
   try {
-    const out = execFileSync('git', ['-C', __dirname, 'show', '-s', '--format=%ct:%h', ref], {
+    return fs.realpathSync(__filename);
+  } catch (_) {
+    return __filename;
+  }
+}
+
+const SCRIPT_REALPATH = getRealScriptPath();
+const SCRIPT_DIR = path.dirname(SCRIPT_REALPATH);
+
+function getRepoRoot(cwd = SCRIPT_DIR) {
+  try {
+    return execFileSync('git', ['-C', cwd, 'rev-parse', '--show-toplevel'], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
       timeout: 1000
-    }).trim();
-    const [tsStr, shortSha] = out.split(':');
-    const ts = /^\d+$/.test(tsStr) ? parseInt(tsStr, 10) : null;
-    return { timestamp: ts, short: shortSha || null };
+    }).trim() || null;
   } catch (_) {
     return null;
   }
 }
 
-function getServerCommitInfo() {
-  return getCommitInfoForRef('refs/heads/main') ||
-         getCommitInfoForRef('HEAD') ||
-         { timestamp: null, short: null };
+const REPO_ROOT = getRepoRoot();
+const SCRIPT_REL_PATH = REPO_ROOT ? path.relative(REPO_ROOT, SCRIPT_REALPATH) : null;
+
+function parseCommitInfo(rawOutput) {
+  const trimmed = String(rawOutput || '').trim();
+  if (!trimmed) return null;
+  const parts = trimmed.split(':');
+  if (parts.length < 3) return null;
+  const [sha, tsStr, shortSha] = parts;
+  const ts = /^\d+$/.test(tsStr) ? parseInt(tsStr, 10) : null;
+  return { sha: sha || null, timestamp: ts, short: shortSha || null };
 }
+
+function getCommitInfoForRef(ref, repoDir = SCRIPT_DIR) {
+  try {
+    const out = execFileSync('git', ['-C', repoDir, 'show', '-s', '--format=%H:%ct:%h', ref], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: 1000
+    });
+    return parseCommitInfo(out);
+  } catch (_) {
+    return null;
+  }
+}
+
+function getServerCommitInfo(repoDir = SCRIPT_DIR) {
+  return getCommitInfoForRef('HEAD', repoDir) ||
+         { sha: null, timestamp: null, short: null };
+}
+
+function hasFileChangedBetweenCommits(repoRoot, fromSha, toSha, relPath) {
+  if (!repoRoot || !fromSha || !toSha || !relPath || fromSha === toSha) return false;
+  try {
+    const out = execFileSync('git', ['-C', repoRoot, 'diff', '--name-only', fromSha, toSha, '--', relPath], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: 2000
+    }).trim();
+    return Boolean(out);
+  } catch (_) {
+    return false;
+  }
+}
+
 const SERVER_COMMIT_INFO = getServerCommitInfo();
 let latestRepoCommitInfo = { ...SERVER_COMMIT_INFO };
-const REPO_COMMIT_CHECK_INTERVAL_MS = 30000;
+let remoteMainUpdate = { available: false, short: null, timestamp: null };
 
 function refreshRepoCommitInfo() {
   const next = getServerCommitInfo();
-  const changed = next.timestamp !== latestRepoCommitInfo.timestamp || next.short !== latestRepoCommitInfo.short;
-  if (changed) {
-    latestRepoCommitInfo = next;
+  if (!next.sha || !SERVER_COMMIT_INFO.sha) {
+    return { changed: false, shouldRestart: false, next };
   }
-  return changed;
+  if (next.sha === SERVER_COMMIT_INFO.sha) {
+    return { changed: false, shouldRestart: false, next };
+  }
+  const scriptChanged = hasFileChangedBetweenCommits(REPO_ROOT, SERVER_COMMIT_INFO.sha, next.sha, SCRIPT_REL_PATH);
+  if (!scriptChanged) {
+    return { changed: false, shouldRestart: false, next };
+  }
+  const infoChanged = next.sha !== latestRepoCommitInfo.sha;
+  latestRepoCommitInfo = next;
+  return { changed: infoChanged, shouldRestart: true, next };
+}
+
+function execFileAsync(cmd, args, options = {}) {
+  return new Promise((resolve, reject) => {
+    execFile(cmd, args, options, (err, stdout, stderr) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      resolve({ stdout: String(stdout || ''), stderr: String(stderr || '') });
+    });
+  });
+}
+
+async function checkRemoteMainUpdate(repoRoot = REPO_ROOT, relPath = SCRIPT_REL_PATH) {
+  if (!repoRoot || !relPath) return false;
+  try {
+    await execFileAsync('git', ['-C', repoRoot, 'fetch', 'origin', 'main', '--quiet'], {
+      timeout: 10000
+    });
+    const [{ stdout: countOut }, { stdout: diffOut }, { stdout: remoteShowOut }] = await Promise.all([
+      execFileAsync('git', ['-C', repoRoot, 'rev-list', '--count', 'HEAD..origin/main'], { timeout: 2000 }),
+      execFileAsync('git', ['-C', repoRoot, 'diff', '--name-only', 'HEAD...origin/main', '--', relPath], { timeout: 2000 }),
+      execFileAsync('git', ['-C', repoRoot, 'show', '-s', '--format=%H:%ct:%h', 'origin/main'], { timeout: 2000 }),
+    ]);
+    const behindCount = parseInt(countOut.trim(), 10) || 0;
+    const hasScriptDiff = Boolean(diffOut.trim());
+    const remoteInfo = parseCommitInfo(remoteShowOut);
+    const nextState = behindCount > 0 && hasScriptDiff && remoteInfo
+      ? { available: true, short: remoteInfo.short, timestamp: remoteInfo.timestamp }
+      : { available: false, short: null, timestamp: null };
+
+    const changed = nextState.available !== remoteMainUpdate.available ||
+                    nextState.short !== remoteMainUpdate.short ||
+                    nextState.timestamp !== remoteMainUpdate.timestamp;
+    if (changed) {
+      remoteMainUpdate = nextState;
+    }
+    return changed;
+  } catch (_) {
+    return false;
+  }
 }
 
 /**
@@ -470,9 +571,41 @@ const KITTY_KEYS = {
 
 // Connected SSE clients
 const sseClients = new Set();
+let firstActiveClientAt = null;
 let lastStateJson = '';
 let lastStateHash = '';
 let lastKnownGoodState = { windows: [], displays: [] };
+
+function addSseClient(res, now = Date.now()) {
+  if (sseClients.size === 0) {
+    firstActiveClientAt = now;
+  }
+  sseClients.add(res);
+}
+
+function removeSseClient(res) {
+  sseClients.delete(res);
+  if (sseClients.size === 0) {
+    firstActiveClientAt = null;
+  }
+}
+
+function clearSseClients() {
+  for (const res of sseClients) {
+    try {
+      res.end();
+      res.destroy();
+    } catch (e) {}
+  }
+  sseClients.clear();
+  firstActiveClientAt = null;
+}
+
+function hasActiveClientFor(durationMs, now = Date.now()) {
+  return sseClients.size > 0 &&
+         firstActiveClientAt !== null &&
+         (now - firstActiveClientAt) >= durationMs;
+}
 
 /**
  * Detect Antigravity CLI state from window name, terminal buffer text, and terminal column width.
@@ -1025,6 +1158,7 @@ async function fetchTerminalState({ forceJxa = false } = {}) {
         commitShort: SERVER_COMMIT_INFO.short,
         repoCommitTimestamp: latestRepoCommitInfo.timestamp,
         repoCommitShort: latestRepoCommitInfo.short,
+        remoteMainUpdate: remoteMainUpdate,
         windows: enriched,
         displays: displays
       };
@@ -1033,11 +1167,11 @@ async function fetchTerminalState({ forceJxa = false } = {}) {
     }
     return lastKnownGoodState && lastKnownGoodState.windows && lastKnownGoodState.windows.length
       ? lastKnownGoodState
-      : { apiVersion: API_VERSION, commitTimestamp: SERVER_COMMIT_INFO.timestamp, commitShort: SERVER_COMMIT_INFO.short, repoCommitTimestamp: latestRepoCommitInfo.timestamp, repoCommitShort: latestRepoCommitInfo.short, windows: [], displays: displays };
+      : { apiVersion: API_VERSION, commitTimestamp: SERVER_COMMIT_INFO.timestamp, commitShort: SERVER_COMMIT_INFO.short, repoCommitTimestamp: latestRepoCommitInfo.timestamp, repoCommitShort: latestRepoCommitInfo.short, remoteMainUpdate: remoteMainUpdate, windows: [], displays: displays };
   } catch (err) {
     return lastKnownGoodState && lastKnownGoodState.windows
       ? lastKnownGoodState
-      : { apiVersion: API_VERSION, commitTimestamp: SERVER_COMMIT_INFO.timestamp, commitShort: SERVER_COMMIT_INFO.short, repoCommitTimestamp: latestRepoCommitInfo.timestamp, repoCommitShort: latestRepoCommitInfo.short, windows: [], displays: [] };
+      : { apiVersion: API_VERSION, commitTimestamp: SERVER_COMMIT_INFO.timestamp, commitShort: SERVER_COMMIT_INFO.short, repoCommitTimestamp: latestRepoCommitInfo.timestamp, repoCommitShort: latestRepoCommitInfo.short, remoteMainUpdate: remoteMainUpdate, windows: [], displays: [] };
   }
 }
 
@@ -1237,7 +1371,8 @@ function computeStateHash(state) {
   const payload = {
     windows: normalized,
     repoCommitTimestamp: state && state.repoCommitTimestamp ? state.repoCommitTimestamp : null,
-    repoCommitShort: state && state.repoCommitShort ? state.repoCommitShort : null
+    repoCommitShort: state && state.repoCommitShort ? state.repoCommitShort : null,
+    remoteMainUpdate: state && state.remoteMainUpdate ? state.remoteMainUpdate : null
   };
   return crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
 }
@@ -1266,7 +1401,7 @@ function broadcast(data) {
     try {
       res.write(payload);
     } catch (err) {
-      sseClients.delete(res);
+      removeSseClient(res);
     }
   }
 }
@@ -1353,6 +1488,7 @@ const server = http.createServer(async (req, res) => {
       commitShort: SERVER_COMMIT_INFO.short,
       repoCommitTimestamp: latestRepoCommitInfo.timestamp,
       repoCommitShort: latestRepoCommitInfo.short,
+      remoteMainUpdate: remoteMainUpdate,
       hostname,
       port: PORT,
       localUrl: `http://localhost:${PORT}`,
@@ -1396,7 +1532,7 @@ const server = http.createServer(async (req, res) => {
       'X-Accel-Buffering': 'no'
     });
 
-    sseClients.add(res);
+    addSseClient(res);
     console.log(`[+] Client connected to /events (${sseClients.size} active)`);
     ensurePolling();
 
@@ -1407,7 +1543,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     req.on('close', () => {
-      sseClients.delete(res);
+      removeSseClient(res);
       console.log(`[-] Client disconnected from /events (${sseClients.size} active)`);
     });
     return;
@@ -1515,21 +1651,120 @@ function ensurePolling() {
 
 module.exports = {
   API_VERSION,
+  RESTART_EXIT_CODE,
   detectAgyState,
   generateQrSvg,
   getHostedPhoneUrl,
   isHostedUrlReachable,
   getDesktopOpenUrl,
   kittySocketCommand,
+  parseCommitInfo,
+  hasFileChangedBetweenCommits,
+  addSseClient,
+  removeSseClient,
+  clearSseClients,
+  hasActiveClientFor,
 };
 
-if (require.main === module) {
-  // Periodic background repo commit check (only broadcasts when SSE clients are connected)
-  const repoCommitTimer = setInterval(() => {
-    if (refreshRepoCommitInfo() && sseClients.size > 0) {
-      pollAndBroadcast();
+function performGitUpdateAndLaunch(rawArgs) {
+  if (!REPO_ROOT) {
+    console.error('[!] --update requires tbx-terminal-deck.js to be inside a git repository.');
+    process.exit(1);
+  }
+  console.log('[↻] Fetching origin/main...');
+  const fetchRes = spawnSync('git', ['-C', REPO_ROOT, 'fetch', 'origin', 'main'], { stdio: 'inherit' });
+  if (fetchRes.status !== 0) {
+    process.exit(fetchRes.status || 1);
+  }
+  const branchRes = spawnSync('git', ['-C', REPO_ROOT, 'rev-parse', '--abbrev-ref', 'HEAD'], { encoding: 'utf8' });
+  const branch = (branchRes.stdout || '').trim();
+  if (branch !== 'main') {
+    console.error(`[!] --update only fast-forwards "main" (currently on "${branch || 'unknown'}"). Switch to main or update manually.`);
+    process.exit(1);
+  }
+  console.log('[↻] Updating local main (git pull --ff-only origin main)...');
+  const pullRes = spawnSync('git', ['-C', REPO_ROOT, 'pull', '--ff-only', 'origin', 'main'], { stdio: 'inherit' });
+  if (pullRes.status !== 0) {
+    process.exit(pullRes.status || 1);
+  }
+  const nextArgs = rawArgs.filter((arg) => arg !== '--update');
+  const child = spawnSync(process.execPath, [SCRIPT_REALPATH, ...nextArgs], { stdio: 'inherit' });
+  process.exit(child.status ?? 0);
+}
+
+function runSupervisor(rawArgs) {
+  let activeChild = null;
+  let shuttingDown = false;
+  let restarted = false;
+
+  function forwardSignal(signal) {
+    shuttingDown = true;
+    if (activeChild && !activeChild.killed) {
+      try {
+        activeChild.kill(signal);
+      } catch (_) {}
     }
-  }, REPO_COMMIT_CHECK_INTERVAL_MS);
+  }
+
+  process.on('SIGINT', () => forwardSignal('SIGINT'));
+  process.on('SIGTERM', () => forwardSignal('SIGTERM'));
+  process.on('SIGHUP', () => forwardSignal('SIGHUP'));
+
+  function spawnWorker() {
+    const workerEnv = {
+      ...process.env,
+      TBX_DECK_WORKER: '1',
+      ...(restarted ? { TBX_NO_OPEN: '1' } : {}),
+    };
+    activeChild = spawn(process.execPath, [SCRIPT_REALPATH, ...rawArgs], {
+      stdio: 'inherit',
+      env: workerEnv,
+    });
+    activeChild.on('exit', (code, signal) => {
+      activeChild = null;
+      if (!shuttingDown && code === RESTART_EXIT_CODE) {
+        restarted = true;
+        console.log(`\n[↻] Restarting ${path.basename(SCRIPT_REALPATH)} with updated code...\n`);
+        spawnWorker();
+        return;
+      }
+      if (signal) {
+        process.exit(0);
+      }
+      process.exit(code ?? 0);
+    });
+  }
+
+  spawnWorker();
+}
+
+function startDaemon() {
+  let isShuttingDown = false;
+  let gitCheckInFlight = false;
+
+  // Unified 5-minute git check (local autorestart + remote origin/main check),
+  // only when at least one client has been connected for >= 5 minutes.
+  const runUnifiedGitCheck = async () => {
+    if (isShuttingDown || gitCheckInFlight) return;
+    if (!hasActiveClientFor(GIT_UPDATE_CHECK_INTERVAL_MS)) return;
+    gitCheckInFlight = true;
+    try {
+      const localResult = refreshRepoCommitInfo();
+      if (localResult.shouldRestart && process.env.TBX_DECK_WORKER === '1') {
+        console.log(`\n[↻] Detected git change to ${path.basename(SCRIPT_REALPATH)} (${SERVER_COMMIT_INFO.short || 'unknown'} → ${localResult.next.short || 'unknown'}).`);
+        shutdown(RESTART_EXIT_CODE);
+        return;
+      }
+      const remoteChanged = await checkRemoteMainUpdate();
+      if ((localResult.changed || remoteChanged) && sseClients.size > 0) {
+        pollAndBroadcast();
+      }
+    } finally {
+      gitCheckInFlight = false;
+    }
+  };
+  const gitUpdateTimer = setInterval(runUnifiedGitCheck, GIT_UPDATE_CHECK_INTERVAL_MS);
+  if (typeof gitUpdateTimer.unref === 'function') gitUpdateTimer.unref();
 
   // Heartbeat keep-alive every 15s to keep connections healthy
   const heartbeatTimer = setInterval(() => {
@@ -1537,7 +1772,7 @@ if (require.main === module) {
       try {
         res.write(': keepalive\n\n');
       } catch (e) {
-        sseClients.delete(res);
+        removeSseClient(res);
       }
     }
   }, 15000);
@@ -1584,33 +1819,47 @@ if (require.main === module) {
     }
   });
 
-  // Clean and instant shutdown on Ctrl+C (SIGINT) or SIGTERM
-  function shutdown() {
-    console.log('\nShutting down server...');
+  // Clean and instant shutdown on Ctrl+C (SIGINT), SIGTERM, or restart exit
+  function shutdown(exitCode = 0) {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+    const code = typeof exitCode === 'number' ? exitCode : 0;
+    console.log(code === RESTART_EXIT_CODE ? '\nRestarting server...' : '\nShutting down server...');
     if (pollTimer !== null) {
       clearTimeout(pollTimer);
       pollTimer = null;
     }
-    clearInterval(repoCommitTimer);
+    clearInterval(gitUpdateTimer);
     clearInterval(heartbeatTimer);
 
-    for (const res of sseClients) {
-      try {
-        res.end();
-        res.destroy();
-      } catch (e) {}
-    }
-    sseClients.clear();
+    clearSseClients();
+
+    const forceExitTimer = setTimeout(() => process.exit(code), 1000);
+    if (typeof forceExitTimer.unref === 'function') forceExitTimer.unref();
 
     try {
       server.closeAllConnections?.();
-      server.close();
-    } catch (e) {}
-
-    process.exit(0);
+      server.close(() => {
+        clearTimeout(forceExitTimer);
+        process.exit(code);
+      });
+    } catch (e) {
+      process.exit(code);
+    }
   }
 
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
-  process.on('SIGHUP', shutdown);
+  process.on('SIGINT', () => shutdown(0));
+  process.on('SIGTERM', () => shutdown(0));
+  process.on('SIGHUP', () => shutdown(0));
+}
+
+if (require.main === module) {
+  const rawArgs = process.argv.slice(2);
+  if (rawArgs.includes('--update')) {
+    performGitUpdateAndLaunch(rawArgs);
+  } else if (process.env.TBX_DECK_WORKER !== '1' && !rawArgs.includes('--no-supervisor')) {
+    runSupervisor(rawArgs);
+  } else {
+    startDaemon();
+  }
 }
