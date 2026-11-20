@@ -518,6 +518,23 @@
       padding-top: 10px;
       border-top: 1px solid var(--card-border);
     }
+    .onboarding-hosts-section {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--card-border);
+    }
+    .onboarding-hosts-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .onboarding-hosts-section .hosts-list {
+      margin-bottom: 0;
+      max-height: 180px;
+    }
     .onboarding-input {
       flex: 1 1 0;
       min-width: 0;
@@ -2283,6 +2300,40 @@
       }
     }
 
+    function getAvailableHostCandidates() {
+      const effectiveUrl = getEffectiveHostUrl();
+      const candidates = loadSavedHosts().filter(h => h.url !== effectiveUrl);
+      if (!isMobileDevice() && effectiveUrl !== 'http://localhost:8999' && !candidates.some(h => h.url === 'http://localhost:8999')) {
+        candidates.push({ url: 'http://localhost:8999', hostname: 'localhost', lastConnectedAt: 0 });
+      }
+      return candidates;
+    }
+
+    function renderOnboardingHostsList() {
+      const container = document.getElementById('onboardingHostsList');
+      if (!container) return;
+      const candidates = getAvailableHostCandidates().slice().sort((a, b) => {
+        const rank = (h) => {
+          const p = hostProbeResults.get(h.url);
+          if (p && p.status === 'online') return 0;
+          if (p && p.status === 'checking') return 1;
+          return 2;
+        };
+        return rank(a) - rank(b);
+      });
+      container.innerHTML = '';
+      for (const host of candidates) {
+        container.appendChild(createHostRow(host, {
+          isActive: false,
+          onRemove: () => {
+            removeSavedHost(host.url);
+            hostProbeResults.delete(host.url);
+            renderOnboardingHostsList();
+          }
+        }));
+      }
+    }
+
     function renderDisconnectedOnboarding() {
       if (hasConnectedOnce || currentWindows.length > 0) return;
       const emptyState = spatialStage.querySelector('.empty-state');
@@ -2291,7 +2342,7 @@
       const targetLabel = apiBase || window.location.origin;
       const mobile = isMobileDevice();
       const lanHttpFromHttps = isHttpsToLanHttp(apiBase);
-      const otherSavedHosts = loadSavedHosts().filter(h => h.url !== getEffectiveHostUrl());
+      const availableCandidates = getAvailableHostCandidates();
       const title = lanHttpFromHttps
         ? '📡 Local Network Access Needed'
         : (mobile ? '📱 Open on your Mac first' : '💻 Local daemon not detected');
@@ -2318,14 +2369,26 @@
               <a class="onboarding-link" href="https://github.com/TarasMazepa/tbx-for-toolbox.dev/blob/main/path/tbx-terminal-deck.js" target="_blank" rel="noopener">View tbx-terminal-deck.js on GitHub ↗</a>
             </div>
           `)}
+          ${availableCandidates.length ? `
+            <div class="onboarding-hosts-section">
+              <div class="onboarding-hosts-label">Available hosts</div>
+              <div class="hosts-list" id="onboardingHostsList"></div>
+            </div>
+          ` : ''}
           <div class="onboarding-host-row">
             <input type="text" class="onboarding-input" id="hostInput" value="${escapeHtml(apiBase)}" placeholder="http://localhost:8999">
             <button type="button" class="header-btn" id="hostSaveBtn">Connect</button>
             ${rawHost ? '<button type="button" class="header-btn" id="hostResetBtn">Reset</button>' : ''}
-            ${otherSavedHosts.length ? `<button type="button" class="header-btn" id="onboardingHostsBtn">Hosts (${otherSavedHosts.length})</button>` : ''}
           </div>
         </div>
       `;
+
+      if (availableCandidates.length) {
+        renderOnboardingHostsList();
+        for (const host of availableCandidates) {
+          probeHost(host.url);
+        }
+      }
 
       const copyBtn = document.getElementById('copyCmdBtn');
       if (copyBtn) {
@@ -2350,11 +2413,6 @@
       const hostResetBtn = document.getElementById('hostResetBtn');
       if (hostResetBtn) {
         hostResetBtn.addEventListener('click', () => saveHostAndReload(''));
-      }
-
-      const onboardingHostsBtn = document.getElementById('onboardingHostsBtn');
-      if (onboardingHostsBtn) {
-        onboardingHostsBtn.addEventListener('click', openHostsModal);
       }
     }
 
@@ -2466,7 +2524,8 @@
 
     async function probeHost(url) {
       hostProbeResults.set(url, { status: 'checking' });
-      renderHostsList();
+      if (hostsModal && !hostsModal.hidden) renderHostsList();
+      renderOnboardingHostsList();
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 1500);
       try {
@@ -2485,6 +2544,7 @@
         hostProbeResults.set(url, { status: 'offline' });
       }
       if (hostsModal && !hostsModal.hidden) renderHostsList();
+      renderOnboardingHostsList();
     }
 
     function renderHostsSummary() {
@@ -2507,6 +2567,57 @@
       `;
     }
 
+    function createHostRow(host, { isActive = false, onRemove = null } = {}) {
+      const probe = hostProbeResults.get(host.url);
+      let dotClass = 'status-dot';
+      if (isActive) {
+        dotClass = isSseConnected ? 'status-dot online' : 'status-dot';
+      } else if (probe) {
+        if (probe.status === 'online') dotClass = 'status-dot online';
+        else if (probe.status === 'checking') dotClass = 'status-dot checking';
+      }
+
+      const displayName = (isActive && connectedHostInfo && connectedHostInfo.hostname)
+        || (probe && probe.hostname)
+        || host.hostname
+        || host.url;
+
+      const verBadgeHtml = (isActive && isSseConnected) || (probe && probe.status === 'online')
+        ? '<span class="host-item-badge ok">Online</span>'
+        : '';
+
+      const row = document.createElement('div');
+      row.className = `host-item${isActive ? ' is-active' : ''}`;
+      row.innerHTML = `
+        <div class="host-item-main">
+          <div class="${dotClass}"></div>
+          <div class="host-item-info">
+            <div class="host-item-title">
+              <span>${escapeHtml(displayName)}</span>
+              ${verBadgeHtml}
+            </div>
+            <div class="host-item-url">${escapeHtml(host.url)}</div>
+          </div>
+        </div>
+        <div class="host-item-actions">
+          ${isActive
+            ? `<span class="host-item-badge ${isSseConnected ? 'ok' : ''}">${isSseConnected ? 'Connected' : 'Active'}</span>`
+            : `<button type="button" class="header-btn host-switch-btn">Switch</button>
+               ${onRemove ? '<button type="button" class="header-btn host-remove-btn" title="Remove host">✕</button>' : ''}`}
+        </div>
+      `;
+
+      const switchBtn = row.querySelector('.host-switch-btn');
+      if (switchBtn) {
+        switchBtn.addEventListener('click', () => saveHostAndReload(host.url));
+      }
+      const removeBtn = row.querySelector('.host-remove-btn');
+      if (removeBtn && onRemove) {
+        removeBtn.addEventListener('click', onRemove);
+      }
+      return row;
+    }
+
     function renderHostsList() {
       if (!hostsList) return;
       const effectiveUrl = getEffectiveHostUrl();
@@ -2527,58 +2638,14 @@
       hostsList.innerHTML = '';
       for (const host of saved) {
         const isActive = host.url === effectiveUrl;
-        const probe = hostProbeResults.get(host.url);
-        let dotClass = 'status-dot';
-        if (isActive) {
-          dotClass = isSseConnected ? 'status-dot online' : 'status-dot';
-        } else if (probe) {
-          if (probe.status === 'online') dotClass = 'status-dot online';
-          else if (probe.status === 'checking') dotClass = 'status-dot checking';
-        }
-
-        const displayName = (isActive && connectedHostInfo && connectedHostInfo.hostname)
-          || (probe && probe.hostname)
-          || host.hostname
-          || host.url;
-
-        const verBadgeHtml = (isActive && isSseConnected) || (probe && probe.status === 'online')
-          ? '<span class="host-item-badge ok">Online</span>'
-          : '';
-
-        const row = document.createElement('div');
-        row.className = `host-item${isActive ? ' is-active' : ''}`;
-        row.innerHTML = `
-          <div class="host-item-main">
-            <div class="${dotClass}"></div>
-            <div class="host-item-info">
-              <div class="host-item-title">
-                <span>${escapeHtml(displayName)}</span>
-                ${verBadgeHtml}
-              </div>
-              <div class="host-item-url">${escapeHtml(host.url)}</div>
-            </div>
-          </div>
-          <div class="host-item-actions">
-            ${isActive
-              ? `<span class="host-item-badge ${isSseConnected ? 'ok' : ''}">${isSseConnected ? 'Connected' : 'Active'}</span>`
-              : `<button type="button" class="header-btn host-switch-btn">Switch</button>
-                 <button type="button" class="header-btn host-remove-btn" title="Remove host">✕</button>`}
-          </div>
-        `;
-
-        const switchBtn = row.querySelector('.host-switch-btn');
-        if (switchBtn) {
-          switchBtn.addEventListener('click', () => saveHostAndReload(host.url));
-        }
-        const removeBtn = row.querySelector('.host-remove-btn');
-        if (removeBtn) {
-          removeBtn.addEventListener('click', () => {
+        hostsList.appendChild(createHostRow(host, {
+          isActive,
+          onRemove: () => {
             removeSavedHost(host.url);
             hostProbeResults.delete(host.url);
             renderHostsList();
-          });
-        }
-        hostsList.appendChild(row);
+          }
+        }));
       }
     }
 
