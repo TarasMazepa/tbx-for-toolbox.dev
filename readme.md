@@ -24,7 +24,7 @@ The `path/` directory contains user-facing CLI scripts for workflow automation, 
 
 ### Multi-Repository & Git Management
 Operates across all checked-out repositories defined in `till/repositories.txt`:
-- `tbx-daily-changes.sh`: Gathers daily commit manifests and git diffs across configured repositories into `daily-changes/generated/` with smart time defaults, date selection, origin auto-fetching, blocklist support (`till/diff-excludes.txt`), and canonical branch targeting. Follows `daily-changes/AGENTS.md` for Discord summary generation.
+- `tbx-daily-changes.sh`: Gathers daily commit manifests and git diffs across configured repositories into `daily-changes/generated/` with smart time defaults, date selection, origin auto-fetching, blocklist support (`till/diff-excludes.txt`), and canonical branch targeting. Follows `daily-changes/agents.md` for Discord summary generation.
 - `tbx-sync-repositories.sh`: Audits status across configured repositories and automatically pulls updates for all clean repositories.
 - `tbx-status-repositories.sh`: Scans configured repositories for uncommitted changes (staged, unstaged, untracked).
 - `tbx-pull-repositories.sh`: Automatically pulls latest changes for all configured repositories.

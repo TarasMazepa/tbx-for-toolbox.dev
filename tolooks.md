@@ -15,25 +15,17 @@ Exploratory scratchpad for backlog ideas, investigative spikes, architectural in
     - [ ] Verify relative resource paths work when installed in Homebrew's `libexec` / `share` (e.g. [`path/tbx-terminal-deck.js`](path/tbx-terminal-deck.js) reading `website/terminal-deck/index.html`, and `tbx-*.sh` scripts invoked from any directory with config fallback like `~/.config/tbx/`).
     - [ ] Set up a Homebrew formula / tap and release automation (e.g. GitHub Actions updating the formula on tag/release).
 
----
-
-- [ ] **7. Migrate Non-Kebab-Case Markdown Files to `kebab-case`**
-  - **Idea**: Rename remaining uppercase/underscore markdown files to pure `kebab-case` per `agents.md` and update any internal or workflow references to them.
-  - **Context**: `repository-seed` standardized markdown naming to pure `kebab-case` (`agents.md`, `readme.md`, `tolooks.md`, `more-agents.md`).
-  - **Investigation**:
-    - [ ] Rename `MORE-AGENTS.md` → `more-agents.md` and update references
-    - [ ] Rename `README.md` → `readme.md` and update references
-    - [ ] Rename `TOLOOKS.md` → `tolooks.md` and update references
-    - [ ] Rename `daily-changes/AGENTS.md` → `daily-changes/agents.md` and update references
-
 ## Resolved Architectural Decisions
+
+- [x] **7. Migrate Non-Kebab-Case Markdown Files to `kebab-case`**
+  - **Resolution**: Renamed `MORE-AGENTS.md` → `more-agents.md`, `README.md` → `readme.md`, `TOLOOKS.md` → `tolooks.md`, and `daily-changes/AGENTS.md` → `daily-changes/agents.md` via `git mv -f`, and updated internal references across `more-agents.md`, `readme.md`, and `tolooks.md`.
 
 - [x] **6. Migrate Root Scripts into `path/` and `scripts/` Directories**
   - **Status**: Completed across [`path/`](path/), [`scripts/`](scripts/), documentation, and tests.
   - **Resolution**:
     1. Moved all user-facing `tbx-*.sh` and `tbx-*.js` scripts into `path/` and helper scripts into `scripts/`.
     2. Updated relative `require`/path references (e.g. [`path/tbx-terminal-deck.js`](path/tbx-terminal-deck.js), [`tests/terminal-deck/test.js`](tests/terminal-deck/test.js), and `SCRIPT_DIR`/`REPO_ROOT` in `path/*.sh`).
-    3. Updated documentation and workflow references in [`AGENTS.md`](AGENTS.md), [`MORE-AGENTS.md`](MORE-AGENTS.md), [`README.md`](README.md), [`daily-changes/AGENTS.md`](daily-changes/AGENTS.md), [`website/terminal-deck/index.html`](website/terminal-deck/index.html), and `.github/workflows/`.
+    3. Updated documentation and workflow references in [`agents.md`](agents.md), [`more-agents.md`](more-agents.md), [`readme.md`](readme.md), [`daily-changes/agents.md`](daily-changes/agents.md), [`website/terminal-deck/index.html`](website/terminal-deck/index.html), and `.github/workflows/`.
     4. Removed all temporary root compatibility symlinks once `$PATH` pointed to `path/`.
 
 - [x] **4. Host Terminal Deck Webpage on `toolbox.dev` Website**
@@ -76,5 +68,5 @@ Exploratory scratchpad for backlog ideas, investigative spikes, architectural in
 
 ## Related Documentation
 
-- [AGENTS.md](AGENTS.md) — Agent guidelines and ToLooks rules.
-- [docs/seeded/tolooks/README.md](docs/seeded/tolooks/README.md) — ToLooks concept and lifecycle guide.
+- [agents.md](agents.md) — Agent guidelines and ToLooks rules.
+- [docs/seeded/tolooks/readme.md](docs/seeded/tolooks/readme.md) — ToLooks concept and lifecycle guide.
