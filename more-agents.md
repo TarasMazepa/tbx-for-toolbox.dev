@@ -9,7 +9,7 @@ When asked to give a daily summary, summarize daily changes, or prepare a Discor
 1. Check `till/AGENTS.md` if present.
 2. Run `./path/tbx-daily-changes.sh [OPTIONS] [today|yesterday|YYYY-MM-DD] [output-dir]` (or pass `-o <dir>`, defaults to smart time mode: yesterday before 17:00, today at or after 17:00).
 3. **Inspect the Commit Manifest first**: Always inspect `<output-dir>/daily-manifest-<date>.txt` (or the top of `daily-changes-<date>.txt`) to build an explicit inventory of all repositories and commits in scope. Ensure every repository with commits is accounted for in the report. Repositories and high-churn paths (like `hivecomb: *` or `the-time-scramble: snapshot`) can be excluded via `till/diff-excludes.txt`.
-4. Follow the detailed workflow, instructions, and sample summaries in `daily-changes/AGENTS.md`.
+4. Follow the detailed workflow, instructions, and sample summaries in `daily-changes/agents.md`.
 5. Save the formatted Discord summary to `<output-dir>/daily-summary-<date>.md`, where `<output-dir>` is the target directory used by `tbx-daily-changes.sh` (defaulting to `daily-changes/generated`).
 6. Copy the summary to the system clipboard: `pbcopy < <output-dir>/daily-summary-<date>.md`.
 7. Output the summary in your response and confirm that it has been copied to the clipboard.
