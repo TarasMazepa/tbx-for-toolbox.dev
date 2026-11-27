@@ -35,6 +35,7 @@ Operates across all checked-out repositories defined in `till/repositories.txt`:
 - `tbx-gh-status.sh`: Unified GitHub health audit running both PR and Actions workflow status checks in a single dashboard command.
 - `tbx-sort-git-files.sh`: Sorts tracked files in a git repo based on their latest commit timestamp.
 - `tbx-combine-files.sh`: Combines contents of files in a directory into a single consolidated output file.
+- `tbx-cc-fire.sh`: Triggers a remote Claude Code Cloud routine via HTTP `POST` (`<repo> <prompt>`), reading auth from env vars or `~/.claude-code-routine.json`.
 
 ### Antigravity CLI Tooling
 Helpers for managing Antigravity CLI settings (`~/.gemini/antigravity-cli/settings.json`):
