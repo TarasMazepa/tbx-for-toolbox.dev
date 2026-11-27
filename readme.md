@@ -34,6 +34,7 @@ Operates across all checked-out repositories defined in `till/repositories.txt`:
 - `tbx-gh-actions.sh`: Fast parallel audit of GitHub Actions workflow runs across all configured repositories, flagging broken CI and failing scheduled crons.
 - `tbx-gh-status.sh`: Unified GitHub health audit running both PR and Actions workflow status checks in a single dashboard command.
 - `tbx-sort-git-files.sh`: Sorts tracked files in a git repo based on their latest commit timestamp.
+- `tbx-stax-multi-get.sh`: Runs `stax pull --force-delete` and then `stax get --skip-pull` for each provided branch, forwarding any flags.
 - `tbx-combine-files.sh`: Combines contents of files in a directory into a single consolidated output file.
 - `tbx-cc-fire.sh`: Triggers a remote Claude Code Cloud routine via HTTP `POST` (`<repo> <prompt>`), reading auth from env vars or `~/.claude-code-routine.json`.
 
