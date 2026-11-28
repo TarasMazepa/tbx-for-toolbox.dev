@@ -10,7 +10,6 @@ set -euo pipefail
 #
 # Payload format:
 #   {"text": "Repo: <owner/repo>. Change: <prompt>"}
-#   (If <repo> has no "/", it defaults to "TarasMazepa/<repo>".)
 #
 # Required HTTP headers:
 #   - Authorization: Bearer <token>
@@ -74,7 +73,7 @@ Usage:
   tbx-cc-fire.sh [--dry-run] <repo> <prompt>
 
 Arguments:
-  <repo>     Repository name (e.g. "TarasMazepa/stax" or "stax")
+  <repo>     Repository name (e.g. "owner/repo")
   <prompt>   Change description / task prompt
 
 Options:
@@ -126,11 +125,6 @@ fi
 repo="$1"
 shift
 prompt="$*"
-
-case "$repo" in
-  */*) ;;
-  *) repo="TarasMazepa/$repo" ;;
-esac
 
 text="Repo: ${repo}. Change: ${prompt}"
 
